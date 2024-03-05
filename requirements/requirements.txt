@@ -1,0 +1,10 @@
+pandas
+numpy
+datetime
+os
+sys
+requests
+beautifulsoup4
+selenium
+sqlite3
+PyGithub
