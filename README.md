@@ -1,9 +1,15 @@
-# Copenhagen Metro operation monitoring tool
+# Copenhagen metro operations monitoring tool
 
 * Author: kirilboyanovbg[at]gmail.com
-* Last meaningful update: 20-02-2024
+* Last meaningful update: 05-03-2024
 
 This project is centered around automatically gathering data from the [Copenhagen Metro's website](https://m.dk) and monitoring its operations over time in order to find out how often (and when) things are most likely to break. The project consists of two scripts, which are described shortly below.
+
+## Current status
+
+* The raw data fetched in the process is then stored in a `parquet` file, after which point it is subjected to further data processing which standardizes the operational status messages and details their implications for passengers.
+* The web scraping of the data requires the use of a browser instance (implemented using the `selenium` package) to download the correct data.
+* Finally, some data visualizations are prepared based on the processed data. Please note that the latter is in the idea phase as of 05-03-2024.
 
 ## get_data.py
 
