@@ -228,9 +228,9 @@ print(
     f"""Data on the metro's operational status successfully scraped
     and exported to '{data_filepath}' as of {formatted_timestamp}."""
 )
-sys.exit()
 
 # Prompting data cleaning & export to Azure data lake storage
 exec(open("summarize_data.py").read())
+sys.exit()
 
 # %%
