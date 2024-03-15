@@ -4,7 +4,7 @@ App visualizing the CPH Metro's operational status
 ==================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 14-03-2024
+Last meaningful update: 15-03-2024
 
 This script contains the source code of the Streamlit app accompanying
 the CPH metro scraper tool. In here, we create a series of data visualizations
@@ -20,20 +20,77 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import plotly.express as px
+from azure.storage.blob import BlobClient
+import io
+import os
 
-# Importing custom functions for working with ADLS storage
-from azure_storage import get_access, read_blob
 
-# Getting access to the cloud
-azure_conn = get_access("credentials/azure_conn.txt")
+# Custom function to access Azure files annonymously
+def read_blob_anonymously(blob_url: str, **kwargs):
+    """
+    Imports a file stored in Azure blob storage into Python's memory.
+    Object type depends on the file itself and can range from a string,
+    list or dict to a pandas data frame (this is auto detected based
+    on the file extension).
+
+    Args:
+        blob_url (str): URL of the blob
+
+    Raises:
+        ValueError: if we try to read an unsupported file type
+
+    Returns:
+        Any: any object (if pickled), string (if txt), dict (if json) or
+        otherwise pandas.DataFrame
+    """
+    # We use the file extension to determine the function used to read data
+    _, extension = os.path.splitext(blob_url)
+
+    # We download the blob as a Python object
+    blob_client = BlobClient.from_blob_url(blob_url)
+    obj = blob_client.download_blob().readall()
+
+    # For objects assumed to be pandas df, we auto detect the file type
+    # from the file extension and then call the appropriate pandas.read_X() fn
+    if extension == ".csv":
+        conv_obj = pd.read_csv(io.BytesIO(obj), **kwargs)
+    elif extension in [".xlsx", ".xls", ".xlsm"]:
+        conv_obj = pd.read_excel(io.BytesIO(obj), **kwargs)
+    elif extension == ".html":
+        conv_obj = pd.read_html(io.BytesIO(obj), **kwargs)
+    elif extension == ".hdf":
+        conv_obj = pd.read_hdf(io.BytesIO(obj), key="data", **kwargs)
+    elif extension == ".stata":
+        conv_obj = pd.read_stata(io.BytesIO(obj), **kwargs)
+    elif extension == ".gbq":
+        conv_obj = pd.read_gbq(io.BytesIO(obj), "my_dataset.my_table", **kwargs)
+    elif extension == ".parquet":
+        conv_obj = pd.read_parquet(io.BytesIO(obj), **kwargs)
+    elif extension == ".pkl":
+        conv_obj = pd.read_pickle(io.BytesIO(obj), **kwargs)
+    elif extension in [".f", ".feather"]:
+        conv_obj = pd.read_feather(io.BytesIO(obj), **kwargs)
+    # For all other objects, we raise an error, though in theory, we could also
+    # enable the direct import to a bytes IO object
+    else:
+        raise ValueError(f"Unsupported file extension: {extension}")
+    # else:
+    #    conv_obj = io.BytesIO(obj)
+    return conv_obj
 
 
 # %% Importing data for use in the app
 
-# Importing pre-processed data & relevant mapping tables
-operation_fmt = read_blob(azure_conn, "cph-metro-status", "operation_fmt.parquet")
-station_impact = read_blob(azure_conn, "cph-metro-status", "station_impact.parquet")
-mapping_stations = read_blob(azure_conn, "cph-metro-status", "mapping_stations.pkl")
+# Importing pre-processed data & relevant mapping tables from Azure
+operation_fmt = read_blob_anonymously(
+    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/operation_fmt.parquet"
+)
+station_impact = read_blob_anonymously(
+    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/station_impact.parquet"
+)
+mapping_stations = read_blob_anonymously(
+    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_stations.pkl"
+)
 
 # Correcting dtypes
 operation_fmt["date"] = pd.to_datetime(operation_fmt["date"])
