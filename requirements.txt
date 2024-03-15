@@ -4,5 +4,5 @@ streamlit
 plotly
 beautifulsoup4
 selenium
-azure-storage
+azure-storage-blob
 azure-identity
