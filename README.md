@@ -1,9 +1,13 @@
 # Copenhagen metro operations monitoring tool
 
 * Author: kirilboyanovbg[at]gmail.com
-* Last meaningful update: 05-03-2024
+* Last meaningful update: 17-03-2024
 
-This project is centered around automatically gathering data from the [Copenhagen Metro's website](https://m.dk) and monitoring its operations over time in order to find out how often (and when) things are most likely to break. The project consists of two scripts, which are described shortly below.
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://cph-metro.streamlit.app/)
+
+This project is centered around automatically gathering data from the [Copenhagen Metro's website](https://m.dk) and monitoring its operations over time in order to find out how often (and when) things are most likely to break. To facilitate the communication of the insights gathered, the data is presented visually using a [Streamlit app](https://cph-metro.streamlit.app/) (the app is still under active development as of 17-03-2024).
+
+The project consists of four scripts, which are described shortly below.
 
 ## Current status
 
@@ -13,14 +17,16 @@ This project is centered around automatically gathering data from the [Copenhage
 
 ## get_data.py
 
-This script is designed to automatically collect data on the operational status of the Copenhagen Metro and record disruptions. In practice, this happens by scraping the Metro's website, locating the relevant information and then storing it in a local `*.csv` file.
-
-### bug fix from 20-02-2024
-
-Due to an issue with the website, whenever the data was loaded using `BeautifulSoup`, it was incomplete and always showed the same status message. This issue was fixed by using `Selenium` instead, which launches a hidden window and loads the data through a web browser before parsing the HTML contents. With it, the status collected from the tool matches the actual status displayed when visiting the Metro's website.
-
-As a consequence of this bug, the **data collection has been restarted**, meaning that all previous historical data have been deleted.
+This script is designed to automatically collect data on the operational status of the Copenhagen Metro and record disruptions. In practice, this happens by scraping the Metro's website, locating the relevant information and then storing it in local `*.csv` and `*.pkl` files.
 
 ## summarize_data.py
 
 In this script, we import data on the Copenhagen Metro's operational status collected at different timestamps, then add some information on what the status recorded means, then create various tables containing aggregate data. These tables are then exported and can be used for data visualization etc.
+
+## upload_data.py
+
+This script is designed to refresh all output data tables in the relevant Azure data lake blob so that we can enable subsequent queries to get the data and use it for e.g. data visualization purposes. The data stored on Azure is then imported for use in the Streamlit app associated with the project.
+
+## visualize_data.py
+
+This script contains the source code of the Streamlit app accompanying the CPH metro scraper tool. In here, we create a series of data visualizations that help us get a better understanding of how often the metro breaks down, when and where the impact is felt as well as what the reasons behind the breakdowns are (if information on those is available). The streamlit app can then be run locally or accessed through [its website](https://cph-metro.streamlit.app/).
