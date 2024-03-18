@@ -4,7 +4,7 @@ App visualizing the CPH Metro's operational status
 ==================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 15-03-2024
+Last meaningful update: 18-03-2024
 
 This script contains the source code of the Streamlit app accompanying
 the CPH metro scraper tool. In here, we create a series of data visualizations
@@ -143,7 +143,7 @@ def filter_by_n_days(list_of_days):
     selected_n_days = st.sidebar.select_slider(
         "Number of recent days to show",
         list_of_days,
-        value=np.max(list_of_days),
+        value=21,  # showing last 3 weeks by default
     )
     return selected_n_days
 
@@ -664,6 +664,11 @@ def disruption_impact():
     by_day_with_mntn = by_day_with_mntn.sort_values("weekday_n")
     by_day_with_mntn = by_day_with_mntn.reset_index(drop=True)
 
+    # Getting the name of the most impacted day and the extent of the impact
+    most_imp_day_name = by_day_with_mntn["weekday"][0]
+    most_imp_day_val = by_day_with_mntn["status_pct"][0]
+    most_imp_day_val = round(most_imp_day_val, 1)
+
     # Preparing data on the daily likelihood of disruptions, excl. maintenance
     vars_for_group = ["status_en_short", "weekday"]
     by_day_no_mntn = data_to_display.copy()
@@ -699,6 +704,9 @@ def disruption_impact():
     most_impacted = most_impacted.sort_values("n_times_affected", ascending=False)
     most_impacted = most_impacted.iloc[:10]
     most_impacted = most_impacted.sort_values("n_times_affected")
+
+    # Getting the name of the most impacted station
+    most_imp_station_name = most_impacted["station"].iloc[-1]
 
     # Preparing data on the 10 least impacted stations
     least_impacted = st_data_to_display[
@@ -795,9 +803,10 @@ def disruption_impact():
             impacted stations by the disruptions."""
     )
 
-    st.warning(
-        "WIP as of 13-03-2024: page is kind of done but I would like to include some KPIs on top to keep the design consistent with the remaining pages..."
-    )
+    metric1, metric2, metric3 = st.columns(3)
+    metric1.metric("Most impacted day", str(most_imp_day_name))
+    metric2.metric("Avg disruption % on that day", str(most_imp_day_val) + "%")
+    metric3.metric("Most impacted station", str(most_imp_station_name))
 
     st.subheader("Daily frequency of planned disruptions")
     st.markdown(w_mntn_desc)
