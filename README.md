@@ -1,9 +1,9 @@
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://cph-metro.streamlit.app/)
+
 # Copenhagen metro operations monitoring tool
 
 * Author: kirilboyanovbg[at]gmail.com
 * Last meaningful update: 17-03-2024
-
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://cph-metro.streamlit.app/)
 
 This project is centered around automatically gathering data from the [Copenhagen Metro's website](https://m.dk) and monitoring its operations over time in order to find out how often (and when) things are most likely to break. To facilitate the communication of the insights gathered, the data is presented visually using a [Streamlit app](https://cph-metro.streamlit.app/) (the app is still under active development as of 17-03-2024).
 
