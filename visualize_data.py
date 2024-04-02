@@ -4,7 +4,7 @@ App visualizing the CPH Metro's operational status
 ==================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 18-03-2024
+Last meaningful update: 02-04-2024
 
 This script contains the source code of the Streamlit app accompanying
 the CPH metro scraper tool. In here, we create a series of data visualizations
@@ -91,6 +91,9 @@ station_impact = read_blob_anonymously(
 mapping_stations = read_blob_anonymously(
     "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_stations.pkl"
 )
+mapping_messages = read_blob_anonymously(
+    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_messages.pkl"
+)
 
 # Correcting dtypes
 operation_fmt["date"] = pd.to_datetime(operation_fmt["date"])
@@ -116,6 +119,66 @@ last_update = most_recent["timestamp"][0]
 last_update_date = last_update.strftime("%d %B %Y")
 last_update_time = last_update.strftime("%H:%M")
 
+# Extracting the unique names of potentially impacted stations
+unique_stations = station_impact["station"].unique().tolist()
+unique_stations.sort()
+
+# Getting unique intervals and days of time travel
+unique_intervals = station_impact["hour_interval"].unique().tolist()
+unique_intervals.sort()
+unique_day_names = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+]
+
+# Detecting whether there are any unmapped service status messages
+# as well as the date(s) where data accuracy may be impacted due to lacking mapping
+unmapped_msg = operation_fmt[
+    (operation_fmt["status_en"] == "Unknown")
+    & (operation_fmt["status_dk"] != "Unknown")
+][["date", "status_en", "status_dk"]].copy()
+unmapped_rows = len(unmapped_msg)
+total_rows = len(operation_fmt)
+unmappped_rows_pct = round(100 * ((unmapped_rows + 1) / total_rows), 1)
+unmapped_msg = unmapped_msg.drop_duplicates(subset="status_dk")
+unmapped_msg_n = len(unmapped_msg)
+if unmapped_msg_n:
+    unmapped_msg_date_min = unmapped_msg["date"].min()
+    unmapped_msg_date_max = unmapped_msg["date"].max()
+    if unmapped_msg_date_min == unmapped_msg_date_max:
+        unmapped_msg_date_min = None
+    else:
+        unmapped_msg_date_min = unmapped_msg_date_min.strftime("%d %B %Y")
+    unmapped_msg_date_max = unmapped_msg_date_max.strftime("%d %B %Y")
+
+# Preparing a warning for the app's front page if there are unmapped entries
+if unmapped_msg_n:
+    if unmapped_msg_date_min:
+        mapping_warning = f"""There are {unmapped_msg_n} metro status messages
+        that have not yet been classified in terms of their impact on service
+        status. This means that in the period {unmapped_msg_date_min}-
+        {unmapped_msg_date_max}, the numbers in the 'Unknown' category may be
+        overestimated and the numbers in the 'Normal service' and 'Disrupted
+        service' categories may be underestimated. The share of records impacted by 
+        this is lower than {unmappped_rows_pct}% across all historical data.
+        """
+    else:
+        mapping_warning = f"""There are {unmapped_msg_n} metro status messages
+        that have not yet been classified in terms of their impact on service
+        status. This means that on {unmapped_msg_date_max}, the numbers in the
+        'Unknown' category may be overestimated and the numbers in the 'Normal
+        service' and 'Disrupted service' categories may be underestimated.
+        The share of records impacted by this is lower than {unmappped_rows_pct}%
+        across all historical data.
+        """
+else:
+    mapping_warning = None
+
 
 # %% Preparing some basic things for the app
 
@@ -134,6 +197,9 @@ options = st.sidebar.radio(
         "Disruption reasons",
         "Disruption impact",
         "Disruption history",
+        "Disruption calculator",
+        "Info on data sources",
+        "Legal disclaimer",
     ],
 )
 
@@ -143,7 +209,7 @@ def filter_by_n_days(list_of_days):
     selected_n_days = st.sidebar.select_slider(
         "Number of recent days to show",
         list_of_days,
-        value=21,  # showing last 3 weeks by default
+        value=30,  # showing last 30 days by default
     )
     return selected_n_days
 
@@ -164,6 +230,23 @@ def filter_by_day_type():
     return selected_types
 
 
+# Setting up sidebar filter for hour type (regular or rush hour)
+def filter_by_hour_type():
+    possible_h_types = ["Regular hour", "Morning rush hour", "Afternoon rush hour"]
+    selected_types = st.sidebar.multiselect(
+        "Kinds of hours to show", possible_h_types, default=possible_h_types
+    )
+    # If no option is selected, select all by default
+    if not selected_types:
+        selected_types = possible_h_types
+        st.sidebar.warning(
+            "Warning: Data will not be filtered for hour type due to empty user selection."
+        )
+
+    return selected_types
+
+
+# Setting up sidebar filter for metro line
 def filter_by_line():
     possible_lines = ["M1", "M2", "M3", "M4"]
     selected_line = st.sidebar.multiselect(
@@ -224,45 +307,108 @@ def plot_or_not(plot, df: pd.DataFrame):
 
 # %% Page: Welcome to the app
 
-# Defining the app's welcome message
-welcome_message = "This app presents information on the Copenhagen Metro's operational status over time, allowing to measure the impact of the disruptions caused to passengers on different lines, stations and different times of day."
-
 
 # Informs the user of the app's purpose
-def show_homepage(msg):
-    n_days = filter_by_n_days(n_possible_days)
+def show_homepage():
     st.header("Welcome to the CPH metro status app!")
-    st.write(msg)
     st.markdown(
-        f"""
-                - The app contains operational data covering up to {n_days} days.
-                - The latest date with available data is as of {last_update_date}.
-                """
+        """This app presents information on the Copenhagen Metro's
+    **operational status over time**, allowing to measure the impact of the
+    disruptions caused to passengers on different lines, stations and different
+    times of day."""
     )
-
-    # Displaying a warning that the app is still under development
-    st.subheader("This app is a work in progress")
-    st.warning(
-        """Warning: Please note that this app is still under active
-               development as of 14 March 2024, so some errors and bugs are
-               may occur during its use. Please check back again soon for
-               the release of fixes and new features."""
+    st.markdown(
+        """**Please scroll down** to see the latest operational status
+    as well as learn how to make the best use of the app."""
     )
+    st.image(
+        "resources/metro_map_with_stations.png"
+    )  # image can be disabled in development phase
 
     # Displaying the latest service message from the metro's website
-    st.subheader("Latest service status data")
+    st.subheader("Latest service status data", divider="rainbow")
+    if mapping_warning:
+        st.warning(mapping_warning)
     st.markdown(
         f"""The **latest data** on the CPH metro's service status were
-            collected on {last_update_date} at {last_update_time} o'clock.
+            collected on **{last_update_date} at {last_update_time}** o'clock.
             A preview of the latest status for each line is shown below:"""
     )
     st.dataframe(most_recent)
 
-    # Note to self: Replace the image below with a series of cards that help
-    #           the user navigate to a relevant page for answering a specific
-    #          question [WIP as of 12-03-2024]."""
-    #
-    # st.image("resources/app_image.jpg")  # image can be disabled in development phase
+    # Displaying more info on how the app can help the user
+    st.subheader("How this app can help you", divider="rainbow")
+    st.markdown(
+        """This app focuses on keeping track of the Copenhagen Metro's service
+        status and aggregating that data in meaningful ways, allowing you to
+        **find answers to questions such as**:
+        """
+    )
+    st.markdown(
+        f"""
+        - How often has the metro run according to schedule in the past (up to)
+        {n_days} days?
+        - How often has the metro experienced disruptions either due to
+        maintenance or unexpected issues?
+        - What were the main causes behind the disruptions that occurred
+        in the selected time period?
+        - Which days of the week saw the highest number of disruptions and which
+       stations were most impacted by them?
+       - Have there been any improvements/a worsening in the share of time
+       where the metro ran according to schedule in the selected time period?
+        """
+    )
+
+    # Displaying more info on how to use the app
+    st.subheader("How to use this app", divider="rainbow")
+    st.markdown("This app consists of the following two panes:")
+    st.markdown(
+        """
+        - **The sidebar**: allows you to navigate between the different pages 
+        included in the app as well as to apply different filters on the data, such
+        as choosing how many days of data to include in the calculations that 
+        generate the data shown on the charts.
+        - **The main panel**: contains various charts, tables and text descriptions.
+        """
+    )
+    st.markdown(
+        "To **switch between different pages**, please click on the page title:"
+    )
+    st.image("Resources/pages_examples.PNG")
+    st.markdown("You will then be redirected to the desired page.")
+
+    # Displaying more info on how the user can filter the data
+    st.subheader("How to apply filters to the data", divider="rainbow")
+    st.markdown(
+        """To **apply a filter to the data**, please click on the filter
+        you wish to apply and select the desired value(s). Please note that the
+        filter that lets you decide how many days of historical data to use in
+        the calculations supports *choosing only one value*. By default, it is set
+        to display the last 30 days:
+        """
+    )
+    st.image("Resources/filter_recent_days.PNG")
+    st.markdown(
+        """All other filters support **choosing multiple values** at the
+        same time. By default, all values are kept:"""
+    )
+    st.image("Resources/filter_lines.PNG")
+    st.markdown(
+        """**Please note** that if you filter the data too much or remove all
+        pre-made selections, there might not be enough data left to display on
+        the charts and the app may revert to selecting something for you.
+        Should that be the case, a **warning message** will be displayed
+        such as the one below:
+        """
+    )
+    st.image("Resources/selection_warning.PNG")
+    st.markdown(
+        """To get rid of the warning, please revise your selection
+        or refresh the web page to start over.
+        """
+    )
+    st.divider()
+    st.markdown("*Front page image source: www.copenhagenmap360.com*")
 
 
 # %% Page: General service overview
@@ -274,6 +420,7 @@ def general_overview():
     # Detecting and confirming slicer selections
     n_days = filter_by_n_days(n_possible_days)
     day_types = filter_by_day_type()
+    hour_types = filter_by_hour_type()
     selected_lines = filter_by_line()
 
     # Filtering and arranging the data
@@ -282,6 +429,9 @@ def general_overview():
     ].copy()
     data_to_display = data_to_display[
         data_to_display["day_type"].isin(day_types)
+    ].copy()
+    data_to_display = data_to_display[
+        data_to_display["official_rush_hour"].isin(hour_types)
     ].copy()
     data_to_display = data_to_display[
         data_to_display["line"].isin(selected_lines)
@@ -306,6 +456,7 @@ def general_overview():
     overall_split["status_pct"] = 100 * (
         overall_split["rows_for_status"] / len(overall_split)
     )
+    overall_split["status_pct"] = np.round(overall_split["status_pct"], 1)
     overall_split = overall_split.drop_duplicates(vars_for_group)
     overall_split = overall_split.reset_index(drop=True)
 
@@ -320,6 +471,7 @@ def general_overview():
     detailed_split["status_pct"] = 100 * (
         detailed_split["rows_for_status"] / len(detailed_split)
     )
+    detailed_split["status_pct"] = np.round(detailed_split["status_pct"], 1)
     detailed_split = detailed_split.drop_duplicates(vars_for_group)
     detailed_split = detailed_split.sort_values("rows_for_status")
     detailed_split = detailed_split.reset_index(drop=True)
@@ -388,6 +540,8 @@ def general_overview():
 
     # Plotting the elements in the correct order,
     # starting with KPIs on top of the page and proceeding with charts
+    if mapping_warning:
+        st.warning(mapping_warning)
     st.markdown(
         f"""This page shows information on the **overall status of the metro
         between {selected_period}**, including the share of the time where service
@@ -399,12 +553,12 @@ def general_overview():
     metric2.metric("Disrupted service, pct of time", str(pct_disruption) + "%")
     metric3.metric("Unknown status, pct of time", str(pct_unknown) + "%")
 
-    st.subheader("Overall service status")
+    st.subheader("Overall service status", divider="rainbow")
     st.markdown(overall_desc)
     plot_or_not(overall_chart, overall_split)
     # st.plotly_chart(overall_chart)
 
-    st.subheader("Detailed service status")
+    st.subheader("Detailed service status", divider="rainbow")
     st.markdown(detailed_desc)
     plot_or_not(detailed_chart, detailed_split)
     # st.plotly_chart(detailed_chart)
@@ -419,6 +573,7 @@ def disruption_reasons():
     # Detecting and confirming slicer selections
     n_days = filter_by_n_days(n_possible_days)
     day_types = filter_by_day_type()
+    hour_types = filter_by_hour_type()
     selected_lines = filter_by_line()
 
     # Filtering and arranging the data
@@ -427,6 +582,9 @@ def disruption_reasons():
     ].copy()
     data_to_display = data_to_display[
         data_to_display["day_type"].isin(day_types)
+    ].copy()
+    data_to_display = data_to_display[
+        data_to_display["official_rush_hour"].isin(hour_types)
     ].copy()
     data_to_display = data_to_display[
         data_to_display["line"].isin(selected_lines)
@@ -454,6 +612,7 @@ def disruption_reasons():
     detailed_status["status_pct"] = 100 * (
         detailed_status["rows_for_status"] / len(detailed_status)
     )
+    detailed_status["status_pct"] = np.round(detailed_status["status_pct"], 1)
     detailed_status = detailed_status.drop_duplicates(vars_for_group)
     detailed_status = detailed_status.sort_values("rows_for_status")
     detailed_status = detailed_status.reset_index(drop=True)
@@ -502,6 +661,7 @@ def disruption_reasons():
     reasons_split["status_pct"] = 100 * (
         reasons_split["rows_for_status"] / len(reasons_split)
     )
+    reasons_split["status_pct"] = np.round(reasons_split["status_pct"], 1)
     reasons_split = reasons_split.drop_duplicates(vars_for_group)
     reasons_split = reasons_split.sort_values("rows_for_status")
     reasons_split = reasons_split.reset_index(drop=True)
@@ -522,6 +682,7 @@ def disruption_reasons():
     reasons_det_split["status_pct"] = 100 * (
         reasons_det_split["rows_for_status"] / len(reasons_det_split)
     )
+    reasons_det_split["status_pct"] = np.round(reasons_det_split["status_pct"], 1)
     reasons_det_split = reasons_det_split.drop_duplicates(vars_for_group)
     reasons_det_split = reasons_det_split.sort_values("rows_for_status")
     reasons_det_split = reasons_det_split.reset_index(drop=True)
@@ -569,6 +730,8 @@ def disruption_reasons():
 
     # Plotting the elements in the correct order,
     # starting with KPIs on top of the page and proceeding with charts
+    if mapping_warning:
+        st.warning(mapping_warning)
     st.markdown(
         f"""This page contains insights on the **kinds of service disruptions between
             {selected_period}**, including the reasons behind those disruptions and
@@ -580,12 +743,12 @@ def disruption_reasons():
     metric2.metric("Running with delays", str(pct_delay) + "%")
     metric3.metric("Complete service disruptions", str(pct_stop) + "%")
 
-    st.subheader("Kinds of disruptions")
+    st.subheader("Kinds of disruptions", divider="rainbow")
     st.markdown(status_desc)
     plot_or_not(status_chart, detailed_status)
     # st.plotly_chart(status_chart)
 
-    st.subheader("Reasons behind service disruptions")
+    st.subheader("Reasons behind service disruptions", divider="rainbow")
     st.markdown(reasons_desc)
     plot_or_not(reasons_chart, reasons_split)
     # st.plotly_chart(reasons_chart)
@@ -604,6 +767,7 @@ def disruption_impact():
     # Detecting and confirming slicer selections
     n_days = filter_by_n_days(n_possible_days)
     day_types = filter_by_day_type()
+    hour_types = filter_by_hour_type()
     selected_lines = filter_by_line()
 
     # Filtering and arranging the operations data
@@ -612,6 +776,9 @@ def disruption_impact():
     ].copy()
     data_to_display = data_to_display[
         data_to_display["day_type"].isin(day_types)
+    ].copy()
+    data_to_display = data_to_display[
+        data_to_display["official_rush_hour"].isin(hour_types)
     ].copy()
     data_to_display = data_to_display[
         data_to_display["line"].isin(selected_lines)
@@ -644,7 +811,7 @@ def disruption_impact():
     vars_for_group = ["status_en_short", "weekday"]
     by_day_with_mntn = data_to_display.copy()
     by_day_with_mntn["status_en_short"] = np.where(
-        by_day_with_mntn["status_en"] == "Maintenance/bus replacement",
+        by_day_with_mntn["status_en"] == "Closed for maintenance",
         by_day_with_mntn["status_en_short"],
         "Normal service",
     )
@@ -657,7 +824,8 @@ def disruption_impact():
     by_day_with_mntn["status_pct"] = 100 * (
         by_day_with_mntn["rows_for_status"] / by_day_with_mntn["rows_for_day"]
     )
-    by_day_with_mntn = by_day_with_mntn.drop_duplicates(vars_for_group)
+    by_day_with_mntn["status_pct"] = np.round(by_day_with_mntn["status_pct"], 1)
+    by_day_with_mntn = by_day_with_mntn.drop_duplicates(subset=vars_for_group)
     by_day_with_mntn = by_day_with_mntn[
         by_day_with_mntn["status_en_short"] == "Disruption"
     ].copy()
@@ -665,15 +833,18 @@ def disruption_impact():
     by_day_with_mntn = by_day_with_mntn.reset_index(drop=True)
 
     # Getting the name of the most impacted day and the extent of the impact
-    most_imp_day_name = by_day_with_mntn["weekday"][0]
-    most_imp_day_val = by_day_with_mntn["status_pct"][0]
-    most_imp_day_val = round(most_imp_day_val, 1)
+    if len(by_day_with_mntn):
+        most_imp_day_name = by_day_with_mntn["weekday"].iloc[0]
+        most_imp_day_val = by_day_with_mntn["status_pct"].iloc[0]
+        most_imp_day_val = round(most_imp_day_val, 1)
+    else:
+        most_imp_day_name, most_imp_day_val = "-", 0
 
     # Preparing data on the daily likelihood of disruptions, excl. maintenance
     vars_for_group = ["status_en_short", "weekday"]
     by_day_no_mntn = data_to_display.copy()
     by_day_no_mntn["status_en_short"] = np.where(
-        by_day_no_mntn["status_en"] == "Maintenance/bus replacement",
+        by_day_no_mntn["status_en"] == "Closed for maintenance",
         "Normal service",
         by_day_no_mntn["status_en_short"],
     )
@@ -686,6 +857,7 @@ def disruption_impact():
     by_day_no_mntn["status_pct"] = 100 * (
         by_day_no_mntn["rows_for_status"] / by_day_no_mntn["rows_for_day"]
     )
+    by_day_no_mntn["status_pct"] = np.round(by_day_no_mntn["status_pct"], 1)
     by_day_no_mntn = by_day_no_mntn.drop_duplicates(vars_for_group)
     by_day_no_mntn = by_day_no_mntn[
         by_day_no_mntn["status_en_short"] == "Disruption"
@@ -796,6 +968,8 @@ def disruption_impact():
 
     # Plotting the elements in the correct order,
     # starting with KPIs on top of the page and proceeding with charts
+    if mapping_warning:
+        st.warning(mapping_warning)
     st.markdown(
         f"""This page contains insights on the **impact caused by service disruptions
             between {selected_period}**, including the frequency with each they occur
@@ -808,22 +982,22 @@ def disruption_impact():
     metric2.metric("Avg disruption % on that day", str(most_imp_day_val) + "%")
     metric3.metric("Most impacted station", str(most_imp_station_name))
 
-    st.subheader("Daily frequency of planned disruptions")
+    st.subheader("Daily frequency of planned disruptions", divider="rainbow")
     st.markdown(w_mntn_desc)
     plot_or_not(chart_by_day_w_mntn, by_day_with_mntn)
     # st.plotly_chart(chart_by_day_w_mntn)
 
-    st.subheader("Daily frequency of unplanned disruptions")
+    st.subheader("Daily frequency of unplanned disruptions", divider="rainbow")
     st.markdown(no_mntn_desc)
     plot_or_not(chart_by_day_no_mntn, by_day_no_mntn)
     # st.plotly_chart(chart_by_day_no_mntn)
 
-    st.subheader("Most impacted stations")
+    st.subheader("Most impacted stations", divider="rainbow")
     st.markdown(st_most_desc)
     plot_or_not(chart_stations_most, most_impacted)
     # st.plotly_chart(chart_stations_most)
 
-    st.subheader("Least impacted stations")
+    st.subheader("Least impacted stations", divider="rainbow")
     st.markdown(st_least_desc)
     plot_or_not(chart_stations_least, least_impacted)
     # st.plotly_chart(chart_stations_least)
@@ -838,6 +1012,7 @@ def disruption_history():
     # Detecting and confirming slicer selections
     n_days = filter_by_n_days(n_possible_days)
     day_types = filter_by_day_type()
+    hour_types = filter_by_hour_type()
     selected_lines = filter_by_line()
 
     # Filtering and arranging the data
@@ -846,6 +1021,9 @@ def disruption_history():
     ].copy()
     data_to_display = data_to_display[
         data_to_display["day_type"].isin(day_types)
+    ].copy()
+    data_to_display = data_to_display[
+        data_to_display["official_rush_hour"].isin(hour_types)
     ].copy()
     data_to_display = data_to_display[
         data_to_display["line"].isin(selected_lines)
@@ -879,6 +1057,10 @@ def disruption_history():
     daily_disruption["avg_disr_dur_hours"] = daily_disruption.groupby(vars_for_group)[
         "disruption_duration_hours"
     ].transform("mean")
+    daily_disruption["status_pct"] = np.round(daily_disruption["status_pct"], 1)
+    daily_disruption["avg_disr_dur_hours"] = np.round(
+        daily_disruption["avg_disr_dur_hours"], 1
+    )
     daily_disruption = daily_disruption.drop_duplicates(vars_for_group)
     daily_disruption = daily_disruption[
         daily_disruption["status_en_short"] == "Disruption"
@@ -902,6 +1084,9 @@ def disruption_history():
     ].transform("mean")
     daily_disr_stations["avg_pct_impacted"] = 100 * (
         daily_disr_stations["avg_n_impacted"] / n_total_stations
+    )
+    daily_disr_stations["avg_pct_impacted"] = np.round(
+        daily_disr_stations["avg_pct_impacted"], 1
     )
     daily_disr_stations = daily_disr_stations.drop_duplicates("date")
     daily_disr_stations = daily_disr_stations.reset_index(drop=True)
@@ -999,9 +1184,11 @@ def disruption_history():
 
     # Plotting the elements in the correct order,
     # starting with KPIs on top of the page and proceeding with charts
+    if mapping_warning:
+        st.warning(mapping_warning)
     st.markdown(
         f"""This page shows a full daily history of **service disruptions between
-            {selected_period}**, including the share of the time where service 
+            {selected_period}**, including the share of the time where service
             was running normally, the number and duration of all disruptions
             as well as the top reasons behind them."""
     )
@@ -1011,22 +1198,22 @@ def disruption_history():
     metric2.metric("Average disruptions per day", str(avg_per_day))
     metric3.metric("Average duration", str(avg_duration) + "h")
 
-    st.subheader("Number of disruptions")
+    st.subheader("Number of disruptions", divider="rainbow")
     st.markdown(n_desc)
     plot_or_not(n_disr_chart, daily_disruption)
     # st.plotly_chart(n_disr_chart)
 
-    st.subheader("Disruptions as % of time")
+    st.subheader("Disruptions as % of time", divider="rainbow")
     st.markdown(pct_desc)
     plot_or_not(pct_disr_chart, daily_disruption)
     # st.plotly_chart(pct_disr_chart)
 
-    st.subheader("Duration of disruptions")
+    st.subheader("Duration of disruptions", divider="rainbow")
     st.markdown(h_desc)
     plot_or_not(h_disr_chart, daily_disruption)
     # st.plotly_chart(h_disr_chart)
 
-    st.subheader("Impacted stations")
+    st.subheader("Impacted stations", divider="rainbow")
     st.markdown(stations_desc_pct)
     plot_or_not(stations_chart_pct, daily_disr_stations)
     # st.plotly_chart(stations_chart_pct)
@@ -1036,11 +1223,218 @@ def disruption_history():
     # st.plotly_chart(stations_chart)
 
 
+# %% Disruption calculator page
+
+
+def disruption_calc():
+    st.header("Disruption calculator")
+
+    # Printing more info to the user on how to use this page
+    st.markdown(
+        """On this page, you can calculate the **probability that you will
+    be impacted by service disruptions** depending on which station you intend on
+    using as well as on when you intend on travelling."""
+    )
+    st.warning(
+        """Note: Please use the filters in the sidebar to make the
+        calculations more relevant for your trip."""
+    )
+
+    # Collecting input data from the user from custom sidebar filters
+    selected_station = st.sidebar.selectbox(
+        "Station", unique_stations, index=unique_stations.index("Kongens Nytorv")
+    )
+    selected_hour = st.sidebar.selectbox(
+        "Time of travel", unique_intervals, index=unique_intervals.index("07-08")
+    )
+    selected_day = st.sidebar.selectbox(
+        "Day of travel", unique_day_names, index=unique_day_names.index("Monday")
+    )
+    selected_n_days = st.sidebar.select_slider(
+        "Number of recent days to base the probability calculations off",
+        n_possible_days,
+        value=30,  # last 30 days by default
+    )
+
+    # Aggregating the data by day, hour and station
+    specific_impact = station_impact[
+        station_impact["date_in_last_n_days"] <= selected_n_days
+    ].copy()
+    specific_impact = specific_impact[specific_impact["hour_interval"] == selected_hour]
+    specific_impact = specific_impact[specific_impact["weekday"] == selected_day]
+    specific_impact["disruption"] = specific_impact["status_en_short"] == "Disruption"
+    specific_impact["total_rows"] = specific_impact.groupby(["station"])[
+        "status_dk"
+    ].transform("count")
+    specific_impact["disruption_rows"] = specific_impact.groupby(["station"])[
+        "disruption"
+    ].transform("sum")
+    specific_impact["disruption_chance_pct"] = np.round(
+        100 * (specific_impact["disruption_rows"] / specific_impact["total_rows"]), 1
+    )
+    specific_impact = specific_impact.drop_duplicates(subset="station")
+
+    # Sorting the stations by the likelihood of disruptions
+    specific_impact = specific_impact.sort_values(
+        "disruption_chance_pct", ascending=False
+    )
+    specific_impact = specific_impact.reset_index(drop=True)
+
+    # Exctracting info on the filtered time period
+    min_date = specific_impact["timestamp"].min().strftime("%d %B %Y")
+    max_date = specific_impact["timestamp"].max().strftime("%d %B %Y")
+
+    # Extracting key numbers to show as output
+    disruption_pct_selected = specific_impact[
+        specific_impact["station"] == selected_station
+    ]["disruption_chance_pct"].iloc[0]
+    disruption_pct_most = specific_impact[
+        specific_impact["disruption_chance_pct"]
+        == np.max(specific_impact["disruption_chance_pct"])
+    ]["disruption_chance_pct"].iloc[0]
+    disruption_name_most = specific_impact[
+        specific_impact["disruption_chance_pct"]
+        == np.max(specific_impact["disruption_chance_pct"])
+    ]["station"].iloc[0]
+    disruption_pct_least = specific_impact[
+        specific_impact["disruption_chance_pct"]
+        == np.min(specific_impact["disruption_chance_pct"])
+    ]["disruption_chance_pct"].iloc[0]
+    disruption_name_least = specific_impact[
+        specific_impact["disruption_chance_pct"]
+        == np.min(specific_impact["disruption_chance_pct"])
+    ]["station"].iloc[0]
+
+    # Printing the results to the user
+    st.subheader(f"Chances of disruption at {selected_station}", divider="rainbow")
+    st.markdown(
+        f"""Based on historical data covering the period between **{min_date}
+        and {max_date}**, it can be concluded that:"""
+    )
+    st.markdown(
+        f"""
+    - The chance of disruption at **{selected_station}** on **{selected_day}s** 
+    between **{selected_hour} o'clock** is {disruption_pct_selected}%.
+    - During the same time, the station **most likely** to experience disruption
+    is **{disruption_name_most}** ({disruption_pct_most}%), while the station
+    **least likely** to suffer from disruption is **{disruption_name_least}**
+    ({disruption_pct_least}%).
+    - *Please note* that the numbers below are calculated based on
+    historical data and that it is not guaranteed that historical patterns will
+    be repeated in the future (or on any particular given day).
+    """
+    )
+
+
+# %% Info on data sources and method page
+
+
+def method_info():
+    st.header("Information on data collection & processing")
+    st.markdown(
+        """
+    This page describes how the data that serves as the backbone of this app is
+    collected from the **source** and what kind of **assumptions** are made in the
+    calculations.
+    """
+    )
+    st.subheader("Sourcing operational data", divider="rainbow")
+    st.markdown(
+        """The Copenhagen metro's [website](m.dk) provides **real-time
+    information** on their operating status in the form of an **on-screen banner**."""
+    )
+    st.markdown(
+        """
+    - Data on the metro's operational status is sourced from their website
+    **once every 10 minutes**, producing a total of up to 6 records per hour.
+    In theory, the data could be downloaded every minute, giving us an even
+    greater level of detail, however, the decision to limit the fetching to once
+    every 10 minutes was made out of consideration for limiting the impact on
+    the server side.
+    - Data is fetched for each metro line where the relevant **status message**
+    is recorded alongside a **timestamp** showing when the check was made.
+    - Any newly downloaded data is **appended to a table** containing all previous
+    historical records (this table is then further processed by adding custom
+    calculated columns and such).
+    - In some cases, it may not be possible to fetch any new data. Should that be
+    the case, an **"Unknown" status** will be assigned to the respective timestamp.
+    - When the data is aggregated to **calculate % of time** for e.g. normally
+    running service or disruption, we divide the number of entries in each status
+    group by the total number of entries in the selected time period. Any duration-
+    related metrics are therefore **approximations rather than exact numbers**.
+    - While it is only the metro team that has access to the most fine-grained data
+    and therefore able to provide the exact numbers, due to the data in here being
+    sourced at frequent and regular intervals, the **approximation** of the actual
+    picture they provide can be considered to be **very good**.
+    """
+    )
+
+    st.subheader("Interpreting status messages", divider="rainbow")
+    st.markdown(
+        """
+    A separate **mapping table** that allows us to group the "raw" status messages
+    into separate categories (e.g. "Normal service" or "Disruption") and that
+    allows for recording the impact on stations in a standardised manner is
+    **maintained manually**.
+    """
+    )
+    st.markdown(
+        """
+    - Status messages are mapped by the author of this app approximately **once
+    a week**. If there are any unmapped service messages, a **banner** will be displayed in the app, informing the user of the potential impact of the
+    missing mapping (typically, missing mapping will lead to **more "Unknown"
+    entries**, therefore underestimating the % of time where the metro was either
+    running according to schedule or suffering from a disruption).
+    - For the sake of **transparency**, the entire mapping table is printed below:
+    """
+    )
+    st.dataframe(mapping_messages)
+
+
+# %% Compulsory legal disclaimer
+
+
+def legal_info():
+    st.header("Legal disclaimer")
+    st.markdown(
+        """
+    This application is intended for educational purposes only and is designed to 
+    benefit the general public.
+    
+    **By using this application, you acknowledge and agree to the following terms**:
+                
+    1. The app **gives an insight** into the quality of service provided by the
+    Copenhagen metro as measured through the reliability of its operation.
+    2. The intent of the author is to **empower the general public** (which 
+    provides funding for the service) and **decision-makers** (who may take
+    measures to improve the quality of service).
+    3. Due to the nature of the data collection, the numbers provided in this app
+    are **approximations of the true numbers**, the latter only being in the
+    possession of the Copenhagen metro team.
+    4. The data is collected through the use of **web scraping**, where the metro's
+    website is accessed once every 10 minutes so that the status messages can be
+    recorded. By doing this, the author has strived to strike a balance between the 
+    need to have fine-grained data and the duty to use public resources in a 
+    responsible manner by not overwhelming the server.
+    5. The data and insights provided by this application are **not intended for
+    commercial use**.
+    6. While every effort has been made to ensure the accuracy and reliability of
+    the data, the creator of this application **does not guarantee** the accuracy,
+    completeness, or suitability of the data for any particular purpose.
+    7. The creator **shall not be held liable for** any loss, damage,
+    or inconvenience arising as a consequence of any use of or the inability to
+    use any information provided by this application.
+
+    These terms were last revised on 02 April 2024.
+"""
+    )
+
+
 # %% Allowing the user to switch between pages in the app
 
 # Based on the page selected by the end user
 if options == "Welcome":
-    show_homepage(welcome_message)
+    show_homepage()
 elif options == "Overview":
     general_overview()
 elif options == "Disruption reasons":
@@ -1049,3 +1443,9 @@ elif options == "Disruption impact":
     disruption_impact()
 elif options == "Disruption history":
     disruption_history()
+elif options == "Disruption calculator":
+    disruption_calc()
+elif options == "Info on data sources":
+    method_info()
+elif options == "Legal disclaimer":
+    legal_info()

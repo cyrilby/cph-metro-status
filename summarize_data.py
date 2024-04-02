@@ -4,7 +4,7 @@ Format & summarize data on the CPH Metro's operational status
 =============================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 14-03-2024
+Last meaningful update: 02-04-2024
 
 In this script, we import data on the Copenhagen Metro's operational
 status collected at different timestamps, then add some information
@@ -278,9 +278,20 @@ operation_fmt = pd.merge(operation_fmt, duration_est, how="left", on=id_cols)
 print("Estimating the duration of each disruption successfully completed.")
 
 
-# %% Preparing a table with impacted stations [WIP as of 13-03-2024]
+# %% Preparing a table with impacted stations
 
 print("Preparing a table with impacted stations in progress...")
+
+# Setting inauguration date for specific lines: this can be used to provide
+# more accurate historical depictions of impacted stations on lines that have
+# seen extensions in the period captured by the data
+inauguration_dates = {
+    "Enghave Brygge": "2024-06-30",
+    "Havneholmen": "2024-06-30",
+    "Mozarts Plads": "2024-06-30",
+    "Ny Ellebjerg": "2024-06-30",
+    "Sluseholmen": "2024-06-30",
+}
 
 # Df with unique stations for each line
 unique_stations = mapping_stations[["line", "station"]].copy()
@@ -288,7 +299,7 @@ unique_stations = mapping_stations[["line", "station"]].copy()
 # List of timestamps in the data
 unique_timestamps = operation_fmt["timestamp"].unique().tolist()
 
-# Creating a placeholder where each station has 1 row per date
+# Creating a placeholder where each station has 1 row per timestamp
 station_impact = []
 for timestamp in unique_timestamps:
     temp_data = unique_stations.copy()
@@ -296,12 +307,25 @@ for timestamp in unique_timestamps:
     station_impact.append(temp_data)
 station_impact = pd.concat(station_impact)
 
+# Making sure historical data is represented correctly in cases of line extensions
+station_impact["inauguration_date"] = station_impact["station"].map(inauguration_dates)
+station_impact["inauguration_date"] = pd.to_datetime(
+    station_impact["inauguration_date"]
+)
+station_impact["remove_row"] = (
+    station_impact["timestamp"] < station_impact["inauguration_date"]
+)
+station_impact = station_impact[~station_impact["remove_row"]].copy()
+station_impact = station_impact.drop(columns=["inauguration_date", "remove_row"])
+
 # Getting info on whether service was impacted by timestamp, station and line
 cols_to_keep = [
     "timestamp",
     "date",
     "date_in_last_n_days",
+    "weekday",
     "day_type",
+    "hour",
     "line",
     "status_dk",
     "status_en",
@@ -319,6 +343,27 @@ station_impact = pd.merge(station_impact, affected_stations, how="left", on=id_c
 station_impact["station_impacted"] = station_impact.apply(
     lambda row: row["station"] in row["affected_stations"], axis=1
 )
+
+# Adding a "hour_interval" column to use in the Streamlit app's calculator page
+station_impact["hour_lower"] = station_impact["hour"].astype(str)
+station_impact["hour_lower"] = np.where(
+    station_impact["hour_lower"].str.len() == 1,
+    "0" + station_impact["hour_lower"],
+    station_impact["hour_lower"],
+)
+station_impact["hour_upper"] = (station_impact["hour"] + 1).astype(str)
+station_impact["hour_upper"] = np.where(
+    station_impact["hour_upper"].str.len() == 1,
+    "0" + station_impact["hour_upper"],
+    station_impact["hour_upper"],
+)
+station_impact["hour_upper"] = np.where(
+    station_impact["hour_upper"] == "24", "00", station_impact["hour_upper"]
+)
+station_impact["hour_interval"] = (
+    station_impact["hour_lower"] + "-" + station_impact["hour_upper"]
+)
+station_impact = station_impact.drop(columns=["hour_lower", "hour_upper"])
 
 # Aggregating the number of disrupted stations per timestamp and adding it to the main df
 cols_to_add_to_main = ["n_impacted_stations", "pct_impacted_stations"]

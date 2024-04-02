@@ -4,7 +4,7 @@ Uploading data to Azure data lake storage
 =========================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 14-03-2024
+Last meaningful update: 02-04-2024
 
 This script is designed to refresh all output data tables in the
 relevant Azure data lake blob so that we can enable subsequent queries
@@ -29,6 +29,7 @@ operation_raw = pd.read_pickle("data/operation_raw.pkl")
 operation_fmt = pd.read_parquet("data/operation_fmt.parquet")
 station_impact = pd.read_parquet("data/station_impact.parquet")
 mapping_stations = pd.read_pickle("data/mapping_stations.pkl")
+mapping_messages = pd.read_excel("data/mapping_tables.xlsx", sheet_name="status")
 
 # Getting access to the cloud
 azure_conn = get_access("credentials/azure_conn.txt")
@@ -38,6 +39,7 @@ write_blob(operation_raw, azure_conn, "cph-metro-status", "operation_raw.pkl")
 write_blob(operation_fmt, azure_conn, "cph-metro-status", "operation_fmt.parquet")
 write_blob(station_impact, azure_conn, "cph-metro-status", "station_impact.parquet")
 write_blob(mapping_stations, azure_conn, "cph-metro-status", "mapping_stations.pkl")
+write_blob(mapping_messages, azure_conn, "cph-metro-status", "mapping_messages.pkl")
 
 # Confirming success
 print("Uploading local data to Azure cloud storage successfully completed.")
