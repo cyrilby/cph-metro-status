@@ -1340,7 +1340,7 @@ def method_info():
     )
     st.subheader("Sourcing operational data", divider="rainbow")
     st.markdown(
-        """The Copenhagen metro's [website](www.m.dk) provides **real-time
+        """The Copenhagen metro's [website](https://www.m.dk) provides **real-time
     information** on their operating status in the form of an **on-screen banner**."""
     )
     st.markdown(
