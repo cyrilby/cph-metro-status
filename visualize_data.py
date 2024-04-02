@@ -374,7 +374,7 @@ def show_homepage():
     st.markdown(
         "To **switch between different pages**, please click on the page title:"
     )
-    st.image("Resources/pages_examples.PNG")
+    st.image("resources/pages_examples.PNG")
     st.markdown("You will then be redirected to the desired page.")
 
     # Displaying more info on how the user can filter the data
@@ -387,12 +387,12 @@ def show_homepage():
         to display the last 30 days:
         """
     )
-    st.image("Resources/filter_recent_days.PNG")
+    st.image("resources/filter_recent_days.PNG")
     st.markdown(
         """All other filters support **choosing multiple values** at the
         same time. By default, all values are kept:"""
     )
-    st.image("Resources/filter_lines.PNG")
+    st.image("resources/filter_lines.PNG")
     st.markdown(
         """**Please note** that if you filter the data too much or remove all
         pre-made selections, there might not be enough data left to display on
@@ -401,7 +401,7 @@ def show_homepage():
         such as the one below:
         """
     )
-    st.image("Resources/selection_warning.PNG")
+    st.image("resources/selection_warning.PNG")
     st.markdown(
         """To get rid of the warning, please revise your selection
         or refresh the web page to start over.
