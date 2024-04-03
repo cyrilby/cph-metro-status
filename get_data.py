@@ -4,7 +4,7 @@ Get data on the CPH Metro's operational status
 ==============================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 14-03-2024
+Last meaningful update: 22-03-2024
 
 This script is designed to automatically collect data on the operational
 status of the Copenhagen Metro and record disruptions. In practice, this
@@ -45,10 +45,16 @@ os.chdir(work_dir)
 url = "https://m.dk/"
 
 # Specifying what normal operation looks like when data is scraped and formatted
-normal_status = ["M1", "M2", "M3", "M4", "Alt kører efter planen"]
+normal_status = [
+    ["M1", "M2", "M3", "M4", "Alt kører efter planen"],
+    ["M1", "M2", "Vi kører efter planen", "M3", "M4", "Vi kører efter planen"],
+]
 
 # Specifying valid metro lines
-metro_lines = normal_status[:4]
+metro_lines = ["M1", "M2", "M3", "M4"]
+
+# Specifying which status messages must be kept even if repeated on the web page
+allowed_exceptions = ["Alt kører efter planen", "Vi kører efter planen"]
 
 
 # %% Defining custom functions
@@ -98,18 +104,25 @@ def scrape_website(url: str) -> BeautifulSoup:
 
 
 # Custom function to remove duplicates from list while preserving the original order
-def remove_duplicates(input_list: list) -> list:
+def remove_duplicates(input_list: list, exceptions: list = []) -> list:
     """
     Removes duplicates from list while preserving the original order
-    of the list.
+    of the list. Allows certain duplicates supplied to the function as
+    the "exceptions" list.
 
     Args:
         input_list (list): input list containing duplicates.
+        exceptions (list): list of elements allowed to be duplicated.
 
     Returns:
-        list: output list without duplicates.
+        list: output list without duplicates, except for elements in the exceptions list.
     """
-    return list(dict.fromkeys(input_list))
+    output_list = []
+    for i in input_list:
+        if i in output_list and i not in exceptions:
+            continue
+        output_list.append(i)
+    return output_list
 
 
 # Custom function to scrape current operational status
@@ -141,15 +154,15 @@ def scrape_status_from_web() -> pd.DataFrame:
         for div in current_status_divs:
             current_status.extend(div.find_all("span"))
         current_status = [status.get_text(strip=True) for status in current_status]
-        current_status = remove_duplicates(current_status)
+        current_status = remove_duplicates(current_status, allowed_exceptions)
     else:
         current_status = None
 
     # If everything is running normally, the list will look exactly as the one below
     if current_status:
-        if current_status == normal_status:
+        if current_status in normal_status:
             current_status = pd.DataFrame({"line": metro_lines})
-            current_status["status"] = normal_status[4]
+            current_status["status"] = "Vi kører efter planen"
             current_status["timestamp"] = timestamp
         else:
             current_status = pd.DataFrame({"line": current_status})
@@ -216,14 +229,18 @@ print(current_status.head(4))
 print("\n")
 
 # Appending the data to any previously recorded historical data and formatting
-operation_raw = pd.concat([operation_raw, current_status])
-operation_raw.sort_values(["timestamp", "line"], ascending=[False, True], inplace=True)
-operation_raw.reset_index(inplace=True, drop=True)
-operation_raw = operation_raw[["timestamp", "line", "status"]]
+operation_raw_updated = pd.concat(
+    [operation_raw, current_status.astype(operation_raw.dtypes)]
+)
+operation_raw_updated.sort_values(
+    ["timestamp", "line"], ascending=[False, True], inplace=True
+)
+operation_raw_updated.reset_index(inplace=True, drop=True)
+operation_raw_updated = operation_raw_updated[["timestamp", "line", "status"]]
 
 # Exporting and confirming success
-operation_raw.to_pickle("data/operation_raw.pkl")
-operation_raw.to_csv("data/operation_raw.csv", index=False)
+operation_raw_updated.to_pickle("data/operation_raw.pkl")
+operation_raw_updated.to_csv("data/operation_raw.csv", index=False)
 print(
     f"""Data on the metro's operational status successfully scraped
     and exported to '{data_filepath}' as of {formatted_timestamp}."""
