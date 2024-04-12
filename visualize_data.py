@@ -4,7 +4,7 @@ App visualizing the CPH Metro's operational status
 ==================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 02-04-2024
+Last meaningful update: 12-04-2024
 
 This script contains the source code of the Streamlit app accompanying
 the CPH metro scraper tool. In here, we create a series of data visualizations
@@ -20,7 +20,10 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import plotly.express as px
+import plotly.graph_objects as go
 from azure.storage.blob import BlobClient
+import datetime as dt
+from plotly_calplot import calplot
 import io
 import os
 
@@ -506,6 +509,51 @@ def general_overview():
     pct_disruption = round(pct_disruption, 1)
     pct_unknown = round(pct_unknown, 1)
 
+    # Preparing data on daily disruption score where the score means:
+    # 0 = no disruptions recorded/status "Unknown" only
+    # 1 = at least 1 partial disruption recorded during that day
+    # 2 = at least 1 complete disruption recorded during that day
+    cal_data = data_to_display.copy()
+    cal_data["normal_service"] = cal_data["status_en"] == "Normal service"
+    cal_data["complete_disruption"] = (
+        cal_data["status_en"] == "Complete service disruption"
+    )
+    cal_data["partial_disruption"] = ~cal_data["status_en"].isin(
+        [
+            "Normal service",
+            "Complete service disruption",
+            "Closed for maintenance",
+            "Unknown",
+        ]
+    )
+    cal_data["disruption_score"] = np.where(
+        cal_data["normal_service"],
+        0,
+        np.where(
+            cal_data["partial_disruption"],
+            1,
+            np.where(cal_data["complete_disruption"], 2, 0),
+        ),
+    )
+    cal_data["disruption_score"] = cal_data.groupby("date")[
+        "disruption_score"
+    ].transform("max")
+    cal_data = cal_data.drop_duplicates("date")
+    cal_data = cal_data.reset_index(drop=True)
+    cal_data = cal_data[["date", "disruption_score"]]
+    status_dict = {
+        0: "Normal service",
+        1: "Partial disruption",
+        2: "Complete disruption",
+    }
+    cal_data["interpretation"] = cal_data["disruption_score"].map(status_dict)
+
+    # Recording metadata on the daily disruption score for use on chart
+    cal_n_days = len(cal_data)
+    cal_start_month = cal_data["date"].dt.month.min()
+    cal_end_month = cal_data["date"].dt.month.max()
+    chart_height = 500  # if n_days <= 31 else None
+
     # Creating a doughnut chart with the overall status split
     overall_chart = px.pie(
         overall_split, values="status_pct", names="status_en_short", hole=0.45
@@ -528,6 +576,20 @@ def general_overview():
     detailed_chart.update_xaxes(title_text="% of time with non-normal service status")
     detailed_chart.update_yaxes(title_text="Detailed service status")
 
+    # Creating a calplot heatmap with the daily disruption score
+    custom_colors = [[0, "#28b09c"], [0.5, "#fed16a"], [1, "#fe2b2a"]]
+    cal_fig = calplot(
+        cal_data,
+        x="date",
+        y="disruption_score",
+        total_height=chart_height,
+        colorscale=custom_colors,
+        start_month=cal_start_month,
+        end_month=cal_end_month,
+        text="interpretation",
+        title=f"Metro reliability during the last {cal_n_days} days",
+    )
+
     # Preparing messages describing the charts
     overall_desc = """The chart below shows the overall split between normal service
     operation, service disruptions and unknown status. As such, it indicates how
@@ -537,6 +599,21 @@ def general_overview():
     operate with a normal service and shows the split between the different kinds
     of other service messages. As such, it allows to understand whether service
     was impacted by e.g. planned maintenance, delays or a complete disruption:"""
+    cal_desc_1 = """The chart below shows the daily service reliability of the
+    Copenhagen metro. The **disruption score** plotted on the chart is
+    calculated in the following way:
+    """
+    cal_desc_2 = """
+    - 🟢 If service has been **running normally** or has been affected by planned
+    maintenance on any given day, then the disruption score will be 0 and
+    the day will be plotted with a **green background** on the chart.
+    - 🟡 If service has been affected by at least one **partial disruption** or
+    delay, then the disruption score will be 1 and the day will be plotted
+    with a **yellow background** on the chart.
+    - 🔴 If service has been affected by at least one **complete disruption** or
+    delay, then the disruption score will be 2 and the day will be plotted
+    with a **red background** on the chart.
+    """
 
     # Plotting the elements in the correct order,
     # starting with KPIs on top of the page and proceeding with charts
@@ -562,6 +639,12 @@ def general_overview():
     st.markdown(detailed_desc)
     plot_or_not(detailed_chart, detailed_split)
     # st.plotly_chart(detailed_chart)
+
+    # Plotting a calendar-based overview
+    st.subheader("Daily service reliability", divider="rainbow")
+    st.markdown(cal_desc_1)
+    st.markdown(cal_desc_2)
+    plot_or_not(cal_fig, cal_data)
 
 
 # %% Page: service disruption insights

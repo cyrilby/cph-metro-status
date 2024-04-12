@@ -6,3 +6,4 @@ beautifulsoup4
 selenium
 azure-storage-blob
 azure-identity
+plotly-calplot
