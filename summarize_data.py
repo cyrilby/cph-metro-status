@@ -4,7 +4,7 @@ Format & summarize data on the CPH Metro's operational status
 =============================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 02-04-2024
+Last meaningful update: 23-04-2024
 
 In this script, we import data on the Copenhagen Metro's operational
 status collected at different timestamps, then add some information
@@ -20,6 +20,7 @@ can then be used for e.g. visualization or analytical purposes.
 import pandas as pd
 import numpy as np
 import datetime as dt
+import os
 
 # Importing raw data
 operation_raw = pd.read_pickle("data/operation_raw.pkl")
@@ -118,6 +119,8 @@ if n_unmapped:
     unmapped_status.to_excel("data/unmapped_status_messages.xlsx", index=False)
 else:
     print("Note: all status messages from the metro's website are mapped.")
+    if os.path.isfile("data/unmapped_status_messages.xlsx"):
+        os.remove("data/unmapped_status_messages.xlsx")
 
 
 # %% Adding status-related information to the data
