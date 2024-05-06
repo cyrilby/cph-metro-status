@@ -12,6 +12,10 @@ happens by scraping the Metro's website, locating the relevant information
 and then storing it in a local *.pkl and *.csv file.
 
 Note: do not edit the CSV file in Excel as it may mess up the formatting.
+
+Note 2: this script uses Google Chrome instead of MS Edge and requires
+that the corresponding chromedriver is downloaded from here:
+https://developer.chrome.com/docs/chromedriver/downloads
 """
 
 # %% Setting things up
@@ -24,18 +28,19 @@ import os
 import sys
 from bs4 import BeautifulSoup
 from selenium import webdriver
-from selenium.webdriver.edge.options import Options
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 import requests
 
 # Importing custom functions for working with ADLS storage
 from azure_storage import get_access, write_blob
 
 # Setting up browser options for use in conjuction with Selenium
-edge_options = Options()
-edge_options.use_chromium = True
-edge_options.add_argument("--headless")  # ensuring GUI is off
-edge_options.add_argument("--no-sandbox")
-edge_options.add_argument("--disable-dev-shm-usage")
+chrome_options = Options()
+chrome_options.use_chromium = True
+chrome_options.add_argument("--headless")  # ensuring GUI is off
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
 
 # Specifying file path for storing data
 data_filepath = "data/operation_raw.pkl"
@@ -91,7 +96,8 @@ def scrape_website(url: str) -> BeautifulSoup:
         BeautifulSoup: a BS object that can be searched for HTML tags
     """
     # Loading the web page using a web browser interface
-    driver = webdriver.Edge(options=edge_options)
+    service = Service("chromedriver-win64/chromedriver.exe")
+    driver = webdriver.Chrome(service=service, options=chrome_options)
     driver.get(url)
 
     # Converting the object to BS4 HTML object

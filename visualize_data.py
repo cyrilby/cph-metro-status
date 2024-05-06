@@ -4,7 +4,7 @@ App visualizing the CPH Metro's operational status
 ==================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 12-04-2024
+Last meaningful update: 06-05-2024
 
 This script contains the source code of the Streamlit app accompanying
 the CPH metro scraper tool. In here, we create a series of data visualizations
@@ -514,6 +514,7 @@ def general_overview():
     # 1 = at least 1 partial disruption recorded during that day
     # 2 = at least 1 complete disruption recorded during that day
     cal_data = data_to_display.copy()
+    cal_data["status_unknown"] = cal_data["status_en"] == "Unknown"
     cal_data["normal_service"] = cal_data["status_en"] == "Normal service"
     cal_data["complete_disruption"] = (
         cal_data["status_en"] == "Complete service disruption"
@@ -523,7 +524,6 @@ def general_overview():
             "Normal service",
             "Complete service disruption",
             "Closed for maintenance",
-            "Unknown",
         ]
     )
     cal_data["disruption_score"] = np.where(
@@ -538,10 +538,14 @@ def general_overview():
     cal_data["disruption_score"] = cal_data.groupby("date")[
         "disruption_score"
     ].transform("max")
+    cal_data["disruption_score"] = np.where(
+        cal_data["status_unknown"], -1, cal_data["disruption_score"]
+    )
     cal_data = cal_data.drop_duplicates("date")
     cal_data = cal_data.reset_index(drop=True)
     cal_data = cal_data[["date", "disruption_score"]]
     status_dict = {
+        -1: "Unknown status",
         0: "Normal service",
         1: "Partial disruption",
         2: "Complete disruption",
@@ -577,7 +581,12 @@ def general_overview():
     detailed_chart.update_yaxes(title_text="Detailed service status")
 
     # Creating a calplot heatmap with the daily disruption score
-    custom_colors = [[0, "#28b09c"], [0.5, "#fed16a"], [1, "#fe2b2a"]]
+    custom_colors = [
+        [0, "#ededed"],
+        [0.33, "#28b09c"],
+        [0.66, "#fed16a"],
+        [1, "#fe2b2a"],
+    ]
     cal_fig = calplot(
         cal_data,
         x="date",

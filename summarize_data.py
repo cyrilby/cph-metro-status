@@ -4,7 +4,7 @@ Format & summarize data on the CPH Metro's operational status
 =============================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 23-04-2024
+Last meaningful update: 06-05-2024
 
 In this script, we import data on the Copenhagen Metro's operational
 status collected at different timestamps, then add some information
@@ -22,6 +22,9 @@ import numpy as np
 import datetime as dt
 import os
 
+# Importing custom functions for working with ADLS storage
+from azure_storage import get_access, write_blob
+
 # Importing raw data
 operation_raw = pd.read_pickle("data/operation_raw.pkl")
 
@@ -32,12 +35,90 @@ mapping_rush = pd.read_excel("data/mapping_tables.xlsx", sheet_name="rush_hour")
 mapping_stations = pd.read_excel("data/mapping_tables.xlsx", sheet_name="stations")
 
 
+# %% Defining custom functions
+
+
+# Custom function to generate rounded timestamp for "now"
+def round_now() -> dt.datetime:
+    """
+    Creates a timestamp showing current date and time while
+    also rounding off the minutes to the nearest 0, 10, 20,
+    30, 40 or 50 (by rounding down).
+
+    Returns:
+        dt.datetime: rounded off timestamp
+    """
+    now = dt.datetime.now()
+    minute = (now.minute // 10) * 10
+    return now.replace(minute=minute, second=0, microsecond=0)
+
+
+# Note: pandas timestamps can be similarly rounded off using the line below:
+# pd.to_datetime('2024-05-06 12:39:59').floor('10min')
+
+# %% Ensuring we have rows for all datetimes covered by the data
+
+"""
+If there are issues with the web scraping, gaps in the data collection may occur.
+To avoid underestimating the extent of the "Unknown" status message resulting from
+any such gaps, we create a placeholder that ensures we have a timestamp for each
+10 minutes between the oldest and the most recent timestamp in the raw data.
+"""
+
+print("Ensuring completeness of historical data in progress...")
+
+# Getting the span of time that needs to be covered
+oldest_timestamp = operation_raw["timestamp"].dt.floor("10min").min()
+newest_timestamp = operation_raw["timestamp"].dt.floor("10min").max()
+
+# Creating a range covering all possible rounded timestamps in the above period
+time_range = pd.date_range(oldest_timestamp, newest_timestamp, freq="10min")
+
+# Creating a placeholder df containing rows for all metro lines and timestamps
+full_history = []
+for line in operation_raw["line"].unique():
+    temp_range = pd.DataFrame({"rounded_timestamp": time_range})
+    temp_range["line"] = line
+    full_history.append(temp_range)
+full_history = pd.concat(full_history)
+
+# Adding a rounded timestamp in the actual historical data
+operation_fmt = operation_raw.copy()
+operation_fmt["rounded_timestamp"] = operation_fmt["timestamp"].dt.floor("10min")
+
+# Temporary quick sanity check of timestamps: nothing should be printed when run
+# for time_hist in operation_fmt["rounded_timestamp"].unique().tolist():
+#     if time_hist not in full_history["rounded_timestamp"].unique().tolist():
+#         print(time_hist)
+
+# Adding the actual historical data to the timestamps placeholder df
+vars_for_merge = ["rounded_timestamp", "line"]
+operation_fmt = pd.merge(full_history, operation_fmt, how="left", on=vars_for_merge)
+n_unknown = operation_fmt["status"].isna().sum()
+pct_unknown = round(100 * (n_unknown / len(operation_fmt)), 1)
+print(
+    f"Note: service status data missing in {n_unknown} rows ({pct_unknown}% of all data)."
+)
+
+# Ensuring we have no duplicate entries resulting from e.g. running
+# the scraping more often than once every 10 minutes
+operation_fmt = operation_fmt.drop_duplicates(subset=vars_for_merge)
+
+# Adding "Unknown" status and using the rounded timestamp wherever relevant
+operation_fmt["status"] = operation_fmt["status"].fillna("Unknown")
+operation_fmt["timestamp"] = operation_fmt["timestamp"].fillna(
+    operation_fmt["rounded_timestamp"]
+)
+print("The missing data will be replaced with 'Unknown' status in the output data.")
+
+print("Ensuring completeness of historical data successfully completed.")
+
+
 # %% Adding date and time-related information to the data
 
 print("Adding date and time-related information to the data in progress...")
 
 # Adding calculated columns related to date/time
-operation_fmt = operation_raw.copy()
 operation_fmt["date"] = operation_fmt["timestamp"].dt.date
 operation_fmt["day"] = operation_fmt["timestamp"].dt.day
 operation_fmt["weekday"] = operation_fmt["timestamp"].dt.day_name()
@@ -80,6 +161,7 @@ operation_fmt = pd.merge(operation_fmt, mapping_hours, how="left", on="hour")
 # Adding info on the data's recency
 dates_recency = operation_fmt[["date"]].copy()
 dates_recency = dates_recency.drop_duplicates(subset="date")
+dates_recency = dates_recency.sort_values("date", ascending=False)
 dates_recency = dates_recency.reset_index(drop=True)
 dates_recency["date_in_last_n_days"] = dates_recency.index + 1
 operation_fmt = pd.merge(operation_fmt, dates_recency, how="left", on="date")
@@ -401,13 +483,18 @@ print("Preparing a table with impacted stations successfully completed.")
 operation_fmt.head(5)
 station_impact.head(5)
 
-# Exporting formatted data
+# Exporting formatted data locally
 operation_fmt.to_parquet("data/operation_fmt.parquet")
 station_impact.to_parquet("data/station_impact.parquet")
 mapping_stations.to_pickle("data/mapping_stations.pkl")
 
 # Uploading data to Azure data lake storage
-exec(open("upload_data.py").read())
+azure_conn = get_access("credentials/azure_conn.txt")
+write_blob(operation_fmt, azure_conn, "cph-metro-status", "operation_fmt.parquet")
+write_blob(station_impact, azure_conn, "cph-metro-status", "station_impact.parquet")
+write_blob(mapping_stations, azure_conn, "cph-metro-status", "mapping_stations.pkl")
+write_blob(mapping_status, azure_conn, "cph-metro-status", "mapping_messages.pkl")
+
 
 print("Note: Data cleaned up and exported for use in other scripts/applications.")
 
