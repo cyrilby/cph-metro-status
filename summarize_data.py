@@ -30,11 +30,11 @@ from azure_storage import (
     delete_blob_if_exists,
 )
 
-# # Specifying the working directory
-# script_path = os.path.abspath(__file__)
-# script_dir = os.path.dirname(script_path)
-# os.chdir(script_dir)
-# print(f"Note: files will be saved under '{script_dir}'")
+# Specifying the working directory
+script_path = os.path.abspath(__file__)
+script_dir = os.path.dirname(script_path)
+os.chdir(script_dir)
+print(f"Note: files will be saved under '{script_dir}'")
 
 # Arranging for access to Azure cloud storage
 azure_conn = get_access("credentials/azure_conn.txt")
