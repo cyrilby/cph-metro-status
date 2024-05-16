@@ -37,8 +37,11 @@ edge_options.add_argument("--headless")  # ensuring GUI is off
 edge_options.add_argument("--no-sandbox")
 edge_options.add_argument("--disable-dev-shm-usage")
 
-# Specifying file path for storing data
-data_filepath = "data/operation_raw.pkl"
+# Specifying the working directory
+script_path = os.path.abspath(__file__)
+script_dir = os.path.dirname(script_path)
+os.chdir(script_dir)
+print(f"Note: files will be saved under '{script_dir}'")
 
 # Specifying the working directory
 work_dir = "C:/Users/admkbo/OneDrive - Maersk Broker/Documents/M scraper/"
@@ -242,13 +245,15 @@ operation_raw_updated = operation_raw_updated.reset_index(drop=True)
 operation_raw_updated = operation_raw_updated[["timestamp", "line", "status"]]
 
 # Exporting raw data locally
-operation_raw_updated.to_pickle("data/operation_raw.pkl")
-operation_raw_updated.to_csv("data/operation_raw.csv", index=False)
-
+# operation_raw_updated.to_pickle("data/operation_raw.pkl")
+# operation_raw_updated.to_csv("data/operation_raw.csv", index=False)
 
 # Exporting raw data to Azure and confirming success
 azure_conn = get_access("credentials/azure_conn.txt")
 write_blob(operation_raw, azure_conn, "cph-metro-status", "operation_raw.pkl")
+write_blob(
+    operation_raw, azure_conn, "cph-metro-status", "operation_raw.csv", index=False
+)
 print(
     f"""Data on the metro's operational status successfully scraped
     and exported to '{data_filepath}' as of {formatted_timestamp}."""

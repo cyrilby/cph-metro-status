@@ -23,16 +23,44 @@ import datetime as dt
 import os
 
 # Importing custom functions for working with ADLS storage
-from azure_storage import get_access, write_blob
+from azure_storage import (
+    get_access,
+    write_blob,
+    read_blob_anonymously,
+    delete_blob_if_exists,
+)
 
-# Importing raw data
-operation_raw = pd.read_pickle("data/operation_raw.pkl")
+# # Specifying the working directory
+# script_path = os.path.abspath(__file__)
+# script_dir = os.path.dirname(script_path)
+# os.chdir(script_dir)
+# print(f"Note: files will be saved under '{script_dir}'")
 
-# Importing mapping tables
-mapping_status = pd.read_excel("data/mapping_tables.xlsx", sheet_name="status")
-mapping_hours = pd.read_excel("data/mapping_tables.xlsx", sheet_name="hours")
-mapping_rush = pd.read_excel("data/mapping_tables.xlsx", sheet_name="rush_hour")
-mapping_stations = pd.read_excel("data/mapping_tables.xlsx", sheet_name="stations")
+# Arranging for access to Azure cloud storage
+azure_conn = get_access("credentials/azure_conn.txt")
+
+# Importing raw data from Azure
+operation_raw = read_blob_anonymously(
+    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/operation_raw.pkl"
+)
+
+# Importing mapping tables from Azure
+mapping_status = read_blob_anonymously(
+    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_tables.xlsx",
+    sheet_name="status",
+)
+mapping_hours = read_blob_anonymously(
+    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_tables.xlsx",
+    sheet_name="hours",
+)
+mapping_rush = read_blob_anonymously(
+    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_tables.xlsx",
+    sheet_name="rush_hour",
+)
+mapping_stations = read_blob_anonymously(
+    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_tables.xlsx",
+    sheet_name="stations",
+)
 
 
 # %% Defining custom functions
@@ -196,13 +224,16 @@ n_unmapped = len(unmapped_status)
 if n_unmapped:
     print(f"Note: There are {n_unmapped} unmapped status messages in the raw data.")
     print(
-        "Please check the 'unmapped_status_messages.csv' file in the 'data' folder and add those messags to the 'mapping_tables.xslx' file in the same folder."
+        "Please check the 'unmapped_status_messages.csv' file on Azure and add those messags to the 'mapping_tables.xslx' file in the same blob storage container."
     )
-    unmapped_status.to_excel("data/unmapped_status_messages.xlsx", index=False)
+    write_blob(
+        unmapped_status, azure_conn, "cph-metro-status", "unmapped_status_messages.xlsx"
+    )
 else:
     print("Note: all status messages from the metro's website are mapped.")
-    if os.path.isfile("data/unmapped_status_messages.xlsx"):
-        os.remove("data/unmapped_status_messages.xlsx")
+    delete_blob_if_exists(
+        azure_conn, "cph-metro-status", "unmapped_status_messages.xlsx"
+    )
 
 
 # %% Adding status-related information to the data
@@ -484,12 +515,11 @@ operation_fmt.head(5)
 station_impact.head(5)
 
 # Exporting formatted data locally
-operation_fmt.to_parquet("data/operation_fmt.parquet")
-station_impact.to_parquet("data/station_impact.parquet")
-mapping_stations.to_pickle("data/mapping_stations.pkl")
+# operation_fmt.to_parquet("data/operation_fmt.parquet")
+# station_impact.to_parquet("data/station_impact.parquet")
+# mapping_stations.to_pickle("data/mapping_stations.pkl")
 
 # Uploading data to Azure data lake storage
-azure_conn = get_access("credentials/azure_conn.txt")
 write_blob(operation_fmt, azure_conn, "cph-metro-status", "operation_fmt.parquet")
 write_blob(station_impact, azure_conn, "cph-metro-status", "station_impact.parquet")
 write_blob(mapping_stations, azure_conn, "cph-metro-status", "mapping_stations.pkl")
