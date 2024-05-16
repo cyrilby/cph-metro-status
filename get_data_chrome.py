@@ -263,12 +263,12 @@ operation_raw_updated = operation_raw_updated[["timestamp", "line", "status"]]
 # Exporting raw data to Azure and confirming success
 azure_conn = get_access("credentials/azure_conn.txt")
 write_blob(operation_raw, azure_conn, "cph-metro-status", "operation_raw.pkl")
-write_blob(
-    operation_raw, azure_conn, "cph-metro-status", "operation_raw.csv", index=False
-)
+# write_blob(
+#     operation_raw, azure_conn, "cph-metro-status", "operation_raw.csv", index=False
+# )
 print(
     f"""Data on the metro's operational status successfully scraped
-    and exported to '{data_filepath}' as of {formatted_timestamp}."""
+    and exported to Azure cloud storage as of {formatted_timestamp}."""
 )
 
 # Prompting data cleaning & export to Azure data lake storage
