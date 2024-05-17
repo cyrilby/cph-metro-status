@@ -3,27 +3,30 @@
 # Copenhagen metro operations monitoring tool
 
 * Author: kirilboyanovbg[at]gmail.com
-* Last meaningful update: 06-05-2024
+* Last meaningful update: 17-05-2024
 
-This project is centered around automatically gathering data from the [Copenhagen Metro's website](https://m.dk) and monitoring its operations over time in order to find out how often (and when) things are most likely to break. To facilitate the communication of the insights gathered, the data is presented visually using a [Streamlit app](https://cph-metro.streamlit.app/) (the app is still under active development as of 17-03-2024).
+This project is centered around automatically gathering data from the [Copenhagen Metro's website](https://m.dk) and monitoring its operations over time in order to find out how often (and when) things are most likely to break. To facilitate the communication of the insights gathered, the data is presented visually using a [Streamlit app](https://cph-metro.streamlit.app/).
 
 The project consists of four scripts, which are described shortly below.
 
 ## Current status
 
-* The raw data fetched in the process is then stored in a `parquet` file, after which point it is subjected to further data processing which standardizes the operational status messages and details their implications for passengers.
+* The raw data fetched in the process is then stored in a `pickle` file, after which point it is subjected to further data processing which standardizes the operational status messages and details their implications for passengers.
 * The web scraping of the data requires the use of a browser instance (implemented using the `selenium` package) to download the correct data.
-* Finally, some data visualizations are prepared based on the processed data. Please note that the latter is in the idea phase as of 05-03-2024.
+* Finally, some data visualizations are prepared based on the processed data and are made available via the official [Streamlit app](https://cph-metro.streamlit.app/).
+* All data used in the process are stored on Azure, with free public read-only access.
 
-## get_data.py
+## get_data.py and get_data_chrome.py
 
-This script is designed to automatically collect data on the operational status of the Copenhagen Metro and record disruptions. In practice, this happens by scraping the Metro's website, locating the relevant information and then storing it in local `*.csv` and `*.pkl` files. In addition, the raw data is also exported to Azure cloud storage.
+This script is designed to automatically collect data on the operational status of the Copenhagen Metro and record disruptions. In practice, this happens by scraping the Metro's website, locating the relevant information and then storing it on Azure as a `*.pkl` file.
 
 If using **Microsoft Edge**, there is no need to download or install any additional software. However, if using **Google Chrome**, the user must update the files in the `chromedriver-win64` folder with a version that matches the version of Chrome installed on the system. The newest `chromedriver` can be downloaded from [this page](https://chromedriver.chromium.org/downloads).
 
+**Please note** that the `get_data_chrome.py` script also closes all running instances of Chrome once the scraping is done. This is to ensure that Windows Task Scheduler won't launch too many concurrent instances of Chrome, which may eventually lead to crashing the OS, however, this is not a suitable solution if Google Chrome is the default browser on the system.
+
 ## summarize_data.py
 
-In this script, we import data on the Copenhagen Metro's operational status collected at different timestamps, then add some information on what the status recorded means, then create various tables containing aggregate data. These tables are then exported and can be used for data visualization etc. This includes exporting the clean and processed data to Azure cloud storage.
+In this script, we import data on the Copenhagen Metro's operational status collected at different timestamps, then add some information on what the status recorded means, then create various tables containing aggregate data. These tables are then exported to Azure and can be used for data visualization etc.
 
 ## visualize_data.py
 

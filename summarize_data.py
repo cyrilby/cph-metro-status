@@ -4,7 +4,7 @@ Format & summarize data on the CPH Metro's operational status
 =============================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 06-05-2024
+Last meaningful update: 17-05-2024
 
 In this script, we import data on the Copenhagen Metro's operational
 status collected at different timestamps, then add some information
@@ -227,7 +227,11 @@ if n_unmapped:
         "Please check the 'unmapped_status_messages.csv' file on Azure and add those messags to the 'mapping_tables.xslx' file in the same blob storage container."
     )
     write_blob(
-        unmapped_status, azure_conn, "cph-metro-status", "unmapped_status_messages.xlsx"
+        unmapped_status,
+        azure_conn,
+        "cph-metro-status",
+        "unmapped_status_messages.xlsx",
+        index=False,
     )
 else:
     print("Note: all status messages from the metro's website are mapped.")
@@ -526,6 +530,6 @@ write_blob(mapping_stations, azure_conn, "cph-metro-status", "mapping_stations.p
 write_blob(mapping_status, azure_conn, "cph-metro-status", "mapping_messages.pkl")
 
 
-print("Note: Data cleaned up and exported for use in other scripts/applications.")
+print("Note: Data cleaned up and exported to Azure cloud storage.")
 
 # %%
