@@ -4,7 +4,7 @@ Get data on the CPH Metro's operational status
 ==============================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 07-05-2024
+Last meaningful update: 17-05-2024
 
 This script is designed to automatically collect data on the operational
 status of the Copenhagen Metro and record disruptions. In practice, this
@@ -34,7 +34,7 @@ import requests
 import subprocess
 
 # Importing custom functions for working with ADLS storage
-from azure_storage import get_access, write_blob
+from azure_storage import get_access, write_blob, read_blob_anonymously
 
 # Setting up browser options for use in conjuction with Selenium
 chrome_options = Options()
@@ -42,9 +42,6 @@ chrome_options.use_chromium = True
 chrome_options.add_argument("--headless")  # ensuring GUI is off
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
-
-# Specifying file path for storing data
-data_filepath = "data/operation_raw.pkl"
 
 # Specifying the working directory
 script_path = os.path.abspath(__file__)
@@ -202,18 +199,9 @@ def scrape_status_from_web() -> pd.DataFrame:
 
 # If a file with operational status history exists, we will import it and
 # then append any new data to the bottom of it
-if file_exists(data_filepath):
-    print(
-        """Note: Historical data detected. Any new scraped data
-          will be appended to the bottom of the historical data."""
-    )
-    operation_raw = pd.read_pickle(data_filepath)
-    operation_raw["timestamp"] = pd.to_datetime(
-        operation_raw["timestamp"], format="%Y-%m-%d %H:%M:%S.%f"
-    )
-else:
-    print("Note: No previously recorded historical data detected.")
-    operation_raw = pd.DataFrame()
+operation_raw = read_blob_anonymously(
+    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/operation_raw.pkl"
+)
 
 
 # %% Scraping the Copenhagen Metro's website for new data
@@ -259,10 +247,9 @@ operation_raw_updated = operation_raw_updated[["timestamp", "line", "status"]]
 # operation_raw_updated.to_pickle("data/operation_raw.pkl")
 # operation_raw_updated.to_csv("data/operation_raw.csv", index=False)
 
-
 # Exporting raw data to Azure and confirming success
 azure_conn = get_access("credentials/azure_conn.txt")
-write_blob(operation_raw, azure_conn, "cph-metro-status", "operation_raw.pkl")
+write_blob(operation_raw_updated, azure_conn, "cph-metro-status", "operation_raw.pkl")
 # write_blob(
 #     operation_raw, azure_conn, "cph-metro-status", "operation_raw.csv", index=False
 # )
