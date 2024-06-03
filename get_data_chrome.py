@@ -34,7 +34,7 @@ import requests
 import subprocess
 
 # Importing custom functions for working with ADLS storage
-from azure_storage import get_access, write_blob, read_blob_anonymously
+from azure_storage import get_access, write_blob
 
 # Setting up browser options for use in conjuction with Selenium
 chrome_options = Options()
@@ -199,7 +199,7 @@ def scrape_status_from_web() -> pd.DataFrame:
 
 # If a file with operational status history exists, we will import it and
 # then append any new data to the bottom of it
-operation_raw = read_blob_anonymously(
+operation_raw = pd.read_pickle(
     "https://freelanceprojects.blob.core.windows.net/cph-metro-status/operation_raw.pkl"
 )
 
