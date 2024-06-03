@@ -4,7 +4,7 @@ App visualizing the CPH Metro's operational status
 ==================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 16-05-2024
+Last meaningful update: 03-06-2024
 
 This script contains the source code of the Streamlit app accompanying
 the CPH metro scraper tool. In here, we create a series of data visualizations
@@ -25,23 +25,26 @@ import datetime as dt
 from plotly_calplot import calplot
 import io
 import os
-from azure_storage import read_blob_anonymously
 
 
 # %% Importing data for use in the app
 
 # Importing pre-processed data & relevant mapping tables from Azure
-operation_fmt = read_blob_anonymously(
+operation_fmt = pd.read_parquet(
     "https://freelanceprojects.blob.core.windows.net/cph-metro-status/operation_fmt.parquet"
 )
-station_impact = read_blob_anonymously(
+station_impact = pd.read_parquet(
     "https://freelanceprojects.blob.core.windows.net/cph-metro-status/station_impact.parquet"
 )
-mapping_stations = read_blob_anonymously(
+mapping_stations = pd.read_pickle(
     "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_stations.pkl"
 )
-mapping_messages = read_blob_anonymously(
+mapping_messages = pd.read_pickle(
     "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_messages.pkl"
+)
+system_downtime = pd.read_excel(
+    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_tables.xlsx",
+    sheet_name="system_downtime",
 )
 
 # Correcting dtypes
@@ -211,7 +214,53 @@ def filter_by_line():
     return selected_line
 
 
+# Setting up sidebar filter for system downtime exclusion [WIP as of 03-06-2024]
+def filter_downtime():
+    possible_choices = ["Including system downtime", "Excluding system downtime"]
+    selected_choice = st.sidebar.selectbox(
+        "Showing data",
+        possible_choices,
+        index=possible_choices.index("Including system downtime"),
+    )
+    if selected_choice == "Including system downtime":
+        end_choice = [True, False]
+    else:
+        end_choice = [False]
+    return end_choice
+
+
 # %% Defining further custom functions for the app
+
+
+def deal_with_downtime(data_to_display: pd.DataFrame, selected_rows: list):
+    """
+    Filters the data based on excluding/including periods with system downtime.
+    Prepares a message for the end user describing the situation and the filtering.
+    """
+    # Noting down if periods of system downtime are excluded
+    downtime_days = len(
+        data_to_display[data_to_display["system_downtime"]]["date"].unique()
+    )
+    data_to_display = data_to_display[
+        data_to_display["system_downtime"].isin(selected_rows)
+    ].copy()
+    downtime_days_shown = len(
+        data_to_display[data_to_display["system_downtime"]]["date"].unique()
+    )
+
+    # Generating a message reg. the presence of downtime for the end user
+    if downtime_days > downtime_days_shown:
+        downtime_msg = f""" System downtime affecting {downtime_days} day(s)'
+        worth of data has been hidden from view. Please use the *'Showing data'*
+        slicer to show all data, including periods of system downtime."""
+    elif downtime_days:
+        downtime_msg = f""" System downtime has been detected in this period,
+        affecting {downtime_days} day(s)' worth of data. Please use
+         the *'Showing data'* slicer to exclude periods of downtime."""
+    else:
+        downtime_msg = """No periods of system downtime have been detected in
+        this period, meaning that all available data is shown on charts etc."""
+    return data_to_display, downtime_msg
 
 
 def get_period_string(df: pd.DataFrame, date_col: str):
@@ -371,6 +420,7 @@ def general_overview():
     day_types = filter_by_day_type()
     hour_types = filter_by_hour_type()
     selected_lines = filter_by_line()
+    selected_rows = filter_downtime()
 
     # Filtering and arranging the data
     data_to_display = operation_fmt[
@@ -388,12 +438,16 @@ def general_overview():
     data_to_display = data_to_display.sort_values("date")
     data_to_display = data_to_display.reset_index(drop=True)
 
+    # Dealing with periods of system downtime
+    data_to_display, downtime_msg = deal_with_downtime(data_to_display, selected_rows)
+
     # Confirming the selected period
     selected_period, min_date, max_date = get_period_string(data_to_display, "date")
     date_range = pd.date_range(start=min_date, end=max_date)
     date_range = pd.DataFrame(date_range, columns=["date"])
     st.sidebar.markdown(
         f"**Note:** this selection covers the period between {selected_period}."
+        + downtime_msg
     )
 
     # Preparing data on the overall split by status
@@ -499,7 +553,6 @@ def general_overview():
     cal_data["interpretation"] = cal_data["disruption_score"].map(status_dict)
 
     # Recording metadata on the daily disruption score for use on chart
-    cal_n_days = len(cal_data)
     cal_start_month = cal_data["date"].dt.month.min()
     cal_end_month = cal_data["date"].dt.month.max()
     chart_height = 500  # if n_days <= 31 else None
@@ -542,7 +595,7 @@ def general_overview():
         start_month=cal_start_month,
         end_month=cal_end_month,
         text="interpretation",
-        title=f"Metro reliability during the last {cal_n_days} days",
+        title=f"Metro reliability during the last {n_days} days",
     )
 
     # Preparing messages describing the charts
@@ -568,6 +621,9 @@ def general_overview():
     - 🔴 If service has been affected by at least one **complete disruption** or
     delay, then the disruption score will be 2 and the day will be plotted
     with a **red background** on the chart.
+    - ⚪ If the web scraper tool has not been running due to unexpected system
+    downtime and no data is recorded, then the disruption score will be -1
+    and the day will be plotted with a **grey background** on the chart.
     """
 
     # Plotting the elements in the correct order,
@@ -613,6 +669,7 @@ def disruption_reasons():
     day_types = filter_by_day_type()
     hour_types = filter_by_hour_type()
     selected_lines = filter_by_line()
+    selected_rows = filter_downtime()
 
     # Filtering and arranging the data
     data_to_display = operation_fmt[
@@ -630,12 +687,16 @@ def disruption_reasons():
     data_to_display = data_to_display.sort_values("date")
     data_to_display = data_to_display.reset_index(drop=True)
 
+    # Dealing with periods of system downtime
+    data_to_display, downtime_msg = deal_with_downtime(data_to_display, selected_rows)
+
     # Confirming the selected period
     selected_period, min_date, max_date = get_period_string(data_to_display, "date")
     date_range = pd.date_range(start=min_date, end=max_date)
     date_range = pd.DataFrame(date_range, columns=["date"])
     st.sidebar.markdown(
         f"**Note:** this selection covers the period between {selected_period}."
+        + downtime_msg
     )
 
     # Preparing data on the detailed service status for disrupted service
@@ -807,6 +868,7 @@ def disruption_impact():
     day_types = filter_by_day_type()
     hour_types = filter_by_hour_type()
     selected_lines = filter_by_line()
+    selected_rows = filter_downtime()
 
     # Filtering and arranging the operations data
     data_to_display = operation_fmt[
@@ -837,12 +899,16 @@ def disruption_impact():
     st_data_to_display = st_data_to_display.sort_values("date")
     st_data_to_display = st_data_to_display.reset_index(drop=True)
 
+    # Dealing with periods of system downtime
+    data_to_display, downtime_msg = deal_with_downtime(data_to_display, selected_rows)
+
     # Confirming the selected period
     selected_period, min_date, max_date = get_period_string(data_to_display, "date")
     date_range = pd.date_range(start=min_date, end=max_date)
     date_range = pd.DataFrame(date_range, columns=["date"])
     st.sidebar.markdown(
         f"**Note:** this selection covers the period between {selected_period}."
+        + downtime_msg
     )
 
     # Preparing data on the daily likelihood of disruptions, incl. maintenance
@@ -1052,6 +1118,7 @@ def disruption_history():
     day_types = filter_by_day_type()
     hour_types = filter_by_hour_type()
     selected_lines = filter_by_line()
+    selected_rows = filter_downtime()
 
     # Filtering and arranging the data
     data_to_display = operation_fmt[
@@ -1069,12 +1136,16 @@ def disruption_history():
     data_to_display = data_to_display.sort_values("date")
     data_to_display = data_to_display.reset_index(drop=True)
 
+    # Dealing with periods of system downtime
+    data_to_display, downtime_msg = deal_with_downtime(data_to_display, selected_rows)
+
     # Confirming the selected period
     selected_period, min_date, max_date = get_period_string(data_to_display, "date")
     date_range = pd.date_range(start=min_date, end=max_date)
     date_range = pd.DataFrame(date_range, columns=["date"])
     st.sidebar.markdown(
         f"**Note:** this selection covers the period between {selected_period}."
+        + downtime_msg
     )
 
     # Preparing data for daily disruptions
@@ -1228,7 +1299,7 @@ def disruption_history():
         f"""This page shows a full daily history of **service disruptions between
             {selected_period}**, including the share of the time where service
             was running normally, the number and duration of all disruptions
-            as well as the top reasons behind them."""
+            as well as how many stations were impacted by the disruptions."""
     )
 
     metric1, metric2, metric3 = st.columns(3)
@@ -1367,7 +1438,7 @@ def disruption_calc():
 # %% Info on data sources and method page
 
 
-def method_info():
+def method_info(mapping_messages, system_downtime):
     st.header("Information on data collection & processing")
     st.markdown(
         """
@@ -1428,6 +1499,27 @@ def method_info():
     )
     st.dataframe(mapping_messages)
 
+    st.subheader("Dealing with system downtime", divider="rainbow")
+    st.markdown(
+        """
+    The web scraping tool is not without its faults and as such,
+    it is possible for some days to not have any data collected. This can
+    be due to a variety of reasons, including OS crashes, temporary lack of
+    internet access, power outages, etc. Periods with known system downtime
+    are by default included in the insights but can be filtered out by
+    using the *'Showing data'* slicer:
+    """
+    )
+    st.image("resources/filter_downtime.PNG")
+
+    st.markdown(
+        """For the sake of transparency, all known periods of system
+    downtime, including the reasons behind them, are shown below:"""
+    )
+    system_downtime = system_downtime.sort_values("date", ascending=False)
+    system_downtime = system_downtime.drop(columns="last_modified")
+    st.dataframe(system_downtime)
+
 
 # %% Compulsory legal disclaimer
 
@@ -1484,6 +1576,6 @@ elif options == "Disruption history":
 elif options == "Disruption calculator":
     disruption_calc()
 elif options == "Info on data sources":
-    method_info()
+    method_info(mapping_messages, system_downtime)
 elif options == "Legal disclaimer":
     legal_info()

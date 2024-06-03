@@ -3,7 +3,7 @@ import pickle
 import json
 import pandas as pd
 import os
-from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
+from azure.storage.blob import BlobServiceClient, BlobClient
 from typing import Any
 
 
@@ -79,60 +79,6 @@ def read_blob(
         conv_obj = pd.read_gbq(io.BytesIO(obj), "my_dataset.my_table", **kwargs)
     elif extension == ".parquet":
         conv_obj = pd.read_parquet(io.BytesIO(obj), **kwargs)
-    elif extension in [".f", ".feather"]:
-        conv_obj = pd.read_feather(io.BytesIO(obj), **kwargs)
-    # For all other objects, we raise an error, though in theory, we could also
-    # enable the direct import to a bytes IO object
-    else:
-        raise ValueError(f"Unsupported file extension: {extension}")
-    # else:
-    #    conv_obj = io.BytesIO(obj)
-    return conv_obj
-
-
-# Custom function to access Azure files annonymously
-def read_blob_anonymously(blob_url: str, **kwargs):
-    """
-    Imports a file stored in Azure blob storage into Python's memory.
-    Object type depends on the file itself and can range from a string,
-    list or dict to a pandas data frame (this is auto detected based
-    on the file extension).
-
-    Args:
-        blob_url (str): URL of the blob
-
-    Raises:
-        ValueError: if we try to read an unsupported file type
-
-    Returns:
-        Any: any object (if pickled), string (if txt), dict (if json) or
-        otherwise pandas.DataFrame
-    """
-    # We use the file extension to determine the function used to read data
-    _, extension = os.path.splitext(blob_url)
-
-    # We download the blob as a Python object
-    blob_client = BlobClient.from_blob_url(blob_url)
-    obj = blob_client.download_blob().readall()
-
-    # For objects assumed to be pandas df, we auto detect the file type
-    # from the file extension and then call the appropriate pandas.read_X() fn
-    if extension == ".csv":
-        conv_obj = pd.read_csv(io.BytesIO(obj), **kwargs)
-    elif extension in [".xlsx", ".xls", ".xlsm"]:
-        conv_obj = pd.read_excel(io.BytesIO(obj), **kwargs)
-    elif extension == ".html":
-        conv_obj = pd.read_html(io.BytesIO(obj), **kwargs)
-    elif extension == ".hdf":
-        conv_obj = pd.read_hdf(io.BytesIO(obj), key="data", **kwargs)
-    elif extension == ".stata":
-        conv_obj = pd.read_stata(io.BytesIO(obj), **kwargs)
-    elif extension == ".gbq":
-        conv_obj = pd.read_gbq(io.BytesIO(obj), "my_dataset.my_table", **kwargs)
-    elif extension == ".parquet":
-        conv_obj = pd.read_parquet(io.BytesIO(obj), **kwargs)
-    elif extension == ".pkl":
-        conv_obj = pd.read_pickle(io.BytesIO(obj), **kwargs)
     elif extension in [".f", ".feather"]:
         conv_obj = pd.read_feather(io.BytesIO(obj), **kwargs)
     # For all other objects, we raise an error, though in theory, we could also

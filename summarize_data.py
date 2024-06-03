@@ -4,7 +4,7 @@ Format & summarize data on the CPH Metro's operational status
 =============================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 17-05-2024
+Last meaningful update: 03-06-2024
 
 In this script, we import data on the Copenhagen Metro's operational
 status collected at different timestamps, then add some information
@@ -26,7 +26,6 @@ import os
 from azure_storage import (
     get_access,
     write_blob,
-    read_blob_anonymously,
     delete_blob_if_exists,
 )
 
@@ -40,26 +39,30 @@ print(f"Note: files will be saved under '{script_dir}'")
 azure_conn = get_access("credentials/azure_conn.txt")
 
 # Importing raw data from Azure
-operation_raw = read_blob_anonymously(
+operation_raw = pd.read_pickle(
     "https://freelanceprojects.blob.core.windows.net/cph-metro-status/operation_raw.pkl"
 )
 
 # Importing mapping tables from Azure
-mapping_status = read_blob_anonymously(
+mapping_status = pd.read_excel(
     "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_tables.xlsx",
     sheet_name="status",
 )
-mapping_hours = read_blob_anonymously(
+mapping_hours = pd.read_excel(
     "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_tables.xlsx",
     sheet_name="hours",
 )
-mapping_rush = read_blob_anonymously(
+mapping_rush = pd.read_excel(
     "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_tables.xlsx",
     sheet_name="rush_hour",
 )
-mapping_stations = read_blob_anonymously(
+mapping_stations = pd.read_excel(
     "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_tables.xlsx",
     sheet_name="stations",
+)
+system_downtime = pd.read_excel(
+    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_tables.xlsx",
+    sheet_name="system_downtime",
 )
 
 
@@ -83,6 +86,7 @@ def round_now() -> dt.datetime:
 
 # Note: pandas timestamps can be similarly rounded off using the line below:
 # pd.to_datetime('2024-05-06 12:39:59').floor('10min')
+
 
 # %% Ensuring we have rows for all datetimes covered by the data
 
@@ -196,6 +200,17 @@ operation_fmt = pd.merge(operation_fmt, dates_recency, how="left", on="date")
 
 # Renaming cols etc.
 operation_fmt = operation_fmt.rename(columns={"status": "status_dk"})
+
+# Adding information on known system downtime
+# Note: helps exclude periods where the scraper tool did not work as
+# expected from the data that is visualized in the Streamlit app
+system_downtime = system_downtime[["date", "system_downtime_reason"]].copy()
+system_downtime["date"] = system_downtime["date"].dt.date
+operation_fmt = pd.merge(operation_fmt, system_downtime, how="left", on="date")
+operation_fmt["system_downtime"] = operation_fmt["system_downtime_reason"].notna()
+operation_fmt["system_downtime_reason"] = operation_fmt[
+    "system_downtime_reason"
+].fillna("Web scraper tool running normally")
 
 print("Adding date and time-related information to the data successfully completed.")
 
