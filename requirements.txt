@@ -7,3 +7,4 @@ selenium
 azure-storage-blob
 azure-identity
 plotly-calplot
+openpyxl
