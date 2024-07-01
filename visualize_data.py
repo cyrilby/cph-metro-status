@@ -406,7 +406,7 @@ def show_homepage():
         """
     )
     st.divider()
-    st.markdown("*Front page image source: www.copenhagenmap360.com*")
+    st.markdown("*Front page image source: Metroselskabet (www.m.dk)*")
 
 
 # %% Page: General service overview
