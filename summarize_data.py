@@ -4,7 +4,7 @@ Format & summarize data on the CPH Metro's operational status
 =============================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 03-06-2024
+Last meaningful update: 03-07-2024
 
 In this script, we import data on the Copenhagen Metro's operational
 status collected at different timestamps, then add some information
@@ -258,6 +258,9 @@ else:
 # %% Adding status-related information to the data
 
 print("Adding status-related information to the data in progress...")
+
+# Replacing any potential NANs with "Unknown"
+operation_fmt["status_dk"] = operation_fmt["status_dk"].fillna("Unknown")
 
 # Adding more info on what the status means and which stations are affected
 operation_fmt = pd.merge(operation_fmt, mapping_status, how="left", on="status_dk")
