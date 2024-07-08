@@ -21,6 +21,7 @@ import pandas as pd
 import numpy as np
 import datetime as dt
 import os
+import sys
 
 # Importing custom functions for working with ADLS storage
 from azure_storage import (
@@ -29,8 +30,14 @@ from azure_storage import (
     delete_blob_if_exists,
 )
 
+# Detecting whether the OS the script is running is Linux or Windows
+linux_os = sys.platform == "linux"
+
 # Specifying the working directory
-script_path = os.path.abspath(__file__)
+if linux_os:
+    script_path = os.path.abspath(__name__)
+else:
+    script_path = os.path.abspath(__file__)
 script_dir = os.path.dirname(script_path)
 os.chdir(script_dir)
 print(f"Note: files will be saved under '{script_dir}'")

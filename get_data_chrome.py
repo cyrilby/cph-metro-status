@@ -4,7 +4,7 @@ Get data on the CPH Metro's operational status
 ==============================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 17-05-2024
+Last meaningful update: 09-07-2024
 
 This script is designed to automatically collect data on the operational
 status of the Copenhagen Metro and record disruptions. In practice, this
@@ -43,8 +43,14 @@ chrome_options.add_argument("--headless")  # ensuring GUI is off
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
 
+# Detecting whether the OS the script is running is Linux or Windows
+linux_os = sys.platform == "linux"
+
 # Specifying the working directory
-script_path = os.path.abspath(__file__)
+if linux_os:
+    script_path = os.path.abspath(__name__)
+else:
+    script_path = os.path.abspath(__file__)
 script_dir = os.path.dirname(script_path)
 os.chdir(script_dir)
 print(f"Note: files will be saved under '{script_dir}'")
@@ -96,8 +102,12 @@ def scrape_website(url: str) -> BeautifulSoup:
         BeautifulSoup: a BS object that can be searched for HTML tags
     """
     # Loading the web page using a web browser interface
-    service = Service("chromedriver-win64/chromedriver.exe")
-    driver = webdriver.Chrome(service=service, options=chrome_options)
+    if linux_os:
+        service = Service('/usr/local/bin/chromedriver')
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+    else:
+        service = Service("chromedriver-win64/chromedriver.exe")
+        driver = webdriver.Chrome(service=service, options=chrome_options)
     driver.get(url)
 
     # Converting the object to BS4 HTML object
@@ -110,8 +120,10 @@ def scrape_website(url: str) -> BeautifulSoup:
         print("Request failed - no new data downloaded.")
 
     # Making sure all instances of the Chrome browser are closed
+    # Note: this is only relevant on Windows machines
     driver.quit()
-    subprocess.run("kill_chrome.bat")
+    if not linux_os:
+        subprocess.run("kill_chrome.bat")
 
     # Returning
     return soup
