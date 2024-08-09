@@ -4,7 +4,7 @@ App visualizing the CPH Metro's operational status
 ==================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 03-06-2024
+Last meaningful update: 09-08-2024
 
 This script contains the source code of the Streamlit app accompanying
 the CPH metro scraper tool. In here, we create a series of data visualizations
@@ -214,7 +214,7 @@ def filter_by_line():
     return selected_line
 
 
-# Setting up sidebar filter for system downtime exclusion [WIP as of 03-06-2024]
+# Setting up sidebar filter for system downtime exclusion
 def filter_downtime():
     possible_choices = ["Including system downtime", "Excluding system downtime"]
     selected_choice = st.sidebar.selectbox(
@@ -301,6 +301,50 @@ def plot_or_not(plot, df: pd.DataFrame):
                    no data that can be shown on this chart. Please adjust your
                    selection using the slicers in the sidebar to the left."""
         )
+
+
+def colors_for_calplot(data: pd.DataFrame) -> dict:
+    """
+    Gets all unique combinations of daily service statuses covered
+    by the input data and returns a dictionary containing the right
+    colors depending on what combinations are available based on the
+    following values of the daily status variable:
+    -1: should always be gray
+    0: should always be green
+    1: should always be yellow
+    2: should always be red
+    """
+
+    # Specifying the colors to use on the chart
+    gray = "#ededed"
+    green = "#28b09c"
+    yellow = "#fed16a"
+    red = "#fe2b2a"
+
+    # Specifying all possible combinations of statuses and desired colors
+    desired_colors = {
+        (-1,): [[0, gray], [1, gray]],
+        (0,): [[0, green], [1, green]],
+        (1,): [[0, yellow], [1, yellow]],
+        (2,): [[0, red], [1, red]],
+        (-1, 0): [[0, gray], [1, green]],
+        (-1, 1): [[0, gray], [1, yellow]],
+        (-1, 2): [[0, gray], [1, red]],
+        (0, 1): [[0, green], [1, yellow]],
+        (0, 2): [[0, green], [1, red]],
+        (1, 2): [[0, yellow], [1, red]],
+        (-1, 0, 1): [[0, gray], [0.5, green], [1, yellow]],
+        (-1, 0, 2): [[0, gray], [0.5, green], [1, red]],
+        (-1, 1, 2): [[0, gray], [0.5, yellow], [1, red]],
+        (0, 1, 2): [[0, green], [0.5, yellow], [1, red]],
+        (-1, 0, 1, 2): [[0, gray], [0.33, green], [0.66, yellow], [1, red]],
+    }
+
+    # Getting the unique values of the daily disruption score
+    unique_scores = tuple(data["disruption_score"].sort_values().unique().tolist())
+
+    # Returning the appropriate combination of colors to use on the chart
+    return desired_colors.get(unique_scores, [])
 
 
 # %% Page: Welcome to the app
@@ -579,13 +623,10 @@ def general_overview():
     detailed_chart.update_xaxes(title_text="% of time with non-normal service status")
     detailed_chart.update_yaxes(title_text="Detailed service status")
 
+    # Getting unique statuses to be shown on calplot and choosing the right colors
+    custom_colors = colors_for_calplot(cal_data)
+
     # Creating a calplot heatmap with the daily disruption score
-    custom_colors = [
-        [0, "#ededed"],
-        [0.33, "#28b09c"],
-        [0.66, "#fed16a"],
-        [1, "#fe2b2a"],
-    ]
     cal_fig = calplot(
         cal_data,
         x="date",
