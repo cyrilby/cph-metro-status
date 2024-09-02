@@ -103,7 +103,7 @@ def scrape_website(url: str) -> BeautifulSoup:
     """
     # Loading the web page using a web browser interface
     if linux_os:
-        service = Service('/usr/local/bin/chromedriver')
+        service = Service("/usr/bin/chromedriver")
         driver = webdriver.Chrome(service=service, options=chrome_options)
     else:
         service = Service("chromedriver-win64/chromedriver.exe")
