@@ -4,7 +4,7 @@ Format & summarize data on the CPH Metro's operational status
 =============================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 03-07-2024
+Last meaningful update: 13-09-2024
 
 In this script, we import data on the Copenhagen Metro's operational
 status collected at different timestamps, then add some information
@@ -20,6 +20,7 @@ can then be used for e.g. visualization or analytical purposes.
 import pandas as pd
 import numpy as np
 import datetime as dt
+from datetime import time
 import os
 import sys
 
@@ -72,6 +73,22 @@ system_downtime = pd.read_excel(
     sheet_name="system_downtime",
 )
 
+# Default "Normal" status to be used in cases where messages displayed
+# on screens are only meant to serve as warnings to passengers
+mapping_normal_service = mapping_status[
+    mapping_status["status_dk"] == "Vi kører efter planen"
+]
+ns_status_dk = mapping_normal_service["status_dk"].iloc[0]
+ns_status_en = mapping_normal_service["status_en"].iloc[0]
+ns_reason = mapping_normal_service["reason"].iloc[0]
+ns_closed_for_maintenance = mapping_normal_service["closed_for_maintenance"].iloc[0]
+ns_delayed = mapping_normal_service["delayed"].iloc[0]
+ns_not_running = mapping_normal_service["not_running"].iloc[0]
+ns_skipping_stations = mapping_normal_service["skipping_stations"].iloc[0]
+ns_one_track_only = mapping_normal_service["one_track_only"].iloc[0]
+ns_train_changing = mapping_normal_service["train_changing"].iloc[0]
+ns_affected_stations = mapping_normal_service["affected_stations"].iloc[0]
+
 
 # %% Defining custom functions
 
@@ -93,6 +110,50 @@ def round_now() -> dt.datetime:
 
 # Note: pandas timestamps can be similarly rounded off using the line below:
 # pd.to_datetime('2024-05-06 12:39:59').floor('10min')
+
+
+# Function to convert "hour:minute" to a time object, returning np.nan if input is np.nan
+def convert_to_time(x):
+    if pd.isna(x):
+        return np.nan
+    hour, minute = map(int, x.split(":"))
+    return time(hour, minute)
+
+
+# Function to check if the timestamp's time is between validity_start_time
+# and validity_end_time, considering intervals crossing midnight
+def is_valid_time(row):
+    # Handle NaN values in any of the necessary columns
+    if (
+        pd.isna(row["rounded_timestamp"])
+        or pd.isna(row["validity_start"])
+        or pd.isna(row["validity_end"])
+    ):
+        return np.nan
+
+    start = convert_to_time(row["validity_start"])
+    end = convert_to_time(row["validity_end"])
+    timestamp_time = row["rounded_timestamp"].time()
+
+    # If the interval doesn't cross midnight
+    if start <= end:
+        return start <= timestamp_time <= end
+    # If the interval crosses midnight
+    else:
+        return timestamp_time >= start or timestamp_time <= end
+
+
+# Apply to an existing dataframe with timestamp, validity_start, and validity_end columns
+def apply_time_validation(df):
+    # Ensure 'rounded_timestamp' column is in datetime format
+    df["rounded_timestamp"] = pd.to_datetime(
+        df["rounded_timestamp"], errors="coerce"
+    )  # Coerce errors to NaT (similar to NaN for datetime)
+
+    # Apply the validation check
+    df["status_is_valid"] = df.apply(is_valid_time, axis=1)
+
+    return df
 
 
 # %% Ensuring we have rows for all datetimes covered by the data
@@ -271,6 +332,73 @@ operation_fmt["status_dk"] = operation_fmt["status_dk"].fillna("Unknown")
 
 # Adding more info on what the status means and which stations are affected
 operation_fmt = pd.merge(operation_fmt, mapping_status, how="left", on="status_dk")
+
+# Before proceeding, we check if a status is only valid between certain hours
+operation_fmt["confirm_validity"] = operation_fmt["valid_for_hours"].notna()
+operation_fmt["validity_start"] = np.where(
+    operation_fmt["confirm_validity"],
+    operation_fmt["valid_for_hours"].str.split("-").str[0],
+    np.nan,
+)
+operation_fmt["validity_end"] = np.where(
+    operation_fmt["confirm_validity"],
+    operation_fmt["valid_for_hours"].str.split("-").str[1],
+    np.nan,
+)
+operation_fmt = apply_time_validation(operation_fmt)
+operation_fmt["status_is_valid"] = np.where(
+    operation_fmt["confirm_validity"], operation_fmt["status_is_valid"], True
+)
+
+# If the status is not valid within the given time frame, we
+# use the default "Normal service" status instead
+operation_fmt["status_dk"] = np.where(
+    operation_fmt["status_is_valid"], operation_fmt["status_dk"], ns_status_dk
+)
+operation_fmt["status_en"] = np.where(
+    operation_fmt["status_is_valid"], operation_fmt["status_en"], ns_status_en
+)
+operation_fmt["reason"] = np.where(
+    operation_fmt["status_is_valid"], operation_fmt["reason"], ns_reason
+)
+operation_fmt["closed_for_maintenance"] = np.where(
+    operation_fmt["status_is_valid"],
+    operation_fmt["closed_for_maintenance"],
+    ns_closed_for_maintenance,
+)
+operation_fmt["delayed"] = np.where(
+    operation_fmt["status_is_valid"], operation_fmt["delayed"], ns_delayed
+)
+operation_fmt["not_running"] = np.where(
+    operation_fmt["status_is_valid"], operation_fmt["not_running"], ns_not_running
+)
+operation_fmt["skipping_stations"] = np.where(
+    operation_fmt["status_is_valid"],
+    operation_fmt["skipping_stations"],
+    ns_skipping_stations,
+)
+operation_fmt["one_track_only"] = np.where(
+    operation_fmt["status_is_valid"], operation_fmt["one_track_only"], ns_one_track_only
+)
+operation_fmt["train_changing"] = np.where(
+    operation_fmt["status_is_valid"], operation_fmt["train_changing"], ns_train_changing
+)
+operation_fmt["affected_stations"] = np.where(
+    operation_fmt["status_is_valid"],
+    operation_fmt["affected_stations"],
+    ns_affected_stations,
+)
+
+# Removing temporary columns
+cols_to_drop = [
+    "confirm_validity",
+    "validity_start",
+    "validity_end",
+    "valid_for_hours",
+    "status_is_valid",
+    "status_notes",
+]
+operation_fmt = operation_fmt.drop(columns=cols_to_drop)
 
 # Adding dummies to measure impact on stations
 # First, we get lists of all relevant stations
