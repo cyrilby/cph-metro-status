@@ -4,7 +4,7 @@ Format & summarize data on the CPH Metro's operational status
 =============================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 13-09-2024
+Last meaningful update: 04-11-2024
 
 In this script, we import data on the Copenhagen Metro's operational
 status collected at different timestamps, then add some information
@@ -23,6 +23,7 @@ import datetime as dt
 from datetime import time
 import os
 import sys
+import re
 
 # Importing custom functions for working with ADLS storage
 from azure_storage import (
@@ -154,6 +155,42 @@ def apply_time_validation(df):
     df["status_is_valid"] = df.apply(is_valid_time, axis=1)
 
     return df
+
+
+# Function to avoid double-counting of affected stations
+def confirm_affected_stations(affected_stations: str, line: str) -> str:
+    """
+    Checks whether the "affected_stations" column contains the values
+    of M1/M2/M3/M4 and if so, whether that information is consistent
+    with the information in the "line" column. If yes, then does nothing.
+    If no, then removes any irrelevant line names from "affected_stations".
+
+    Args:
+        affected_stations (str): single value in that column
+        line (str): single value in that column
+
+    Returns:
+        str: verified data for "affected_stations"
+    """
+
+    # Splitting the impacted stations into a list
+    affected_list = affected_stations.split(", ")
+
+    # Valid line values to check
+    to_check = ["M1", "M2", "M3", "M4"]
+    # Filter to only include lines that are present in affected_stations
+    to_check = [ln for ln in to_check if ln + "_All" in affected_list]
+
+    # Removing irrelevant lines
+    for line_str in to_check:
+        if line_str != line:
+            # Remove the line_str if it's not consistent with `line`
+            if line_str not in affected_list:
+                affected_list.remove(line_str + "_All")
+
+    # Returning the outcome as a string
+    affected_new_str = ", ".join(affected_list)
+    return affected_new_str
 
 
 # %% Ensuring we have rows for all datetimes covered by the data
@@ -323,15 +360,38 @@ else:
     )
 
 
-# %% Adding status-related information to the data
+# %% Adding status mapping & correcting impacted metro lines
 
-print("Adding status-related information to the data in progress...")
+"""
+In the status mapping table, it is impossible to tell which lines have
+been affected unless they are explicitly specified in the message.
+However, that information can be inferred based on the raw data, where
+metro lines are available. In here, we add that information so as to
+better account for the impact of the various disruptions.
+"""
+
+print("Adding status mapping & correcting impacted metro lines in progress...")
 
 # Replacing any potential NANs with "Unknown"
 operation_fmt["status_dk"] = operation_fmt["status_dk"].fillna("Unknown")
 
 # Adding more info on what the status means and which stations are affected
 operation_fmt = pd.merge(operation_fmt, mapping_status, how="left", on="status_dk")
+
+# In cases of "affected_stations" == "All_Relevant", we replace
+# the generic description with actual metro lines from the raw data
+operation_fmt["affected_stations"] = np.where(
+    operation_fmt["affected_stations"] == "All_Relevant",
+    operation_fmt["line"] + "_All",
+    operation_fmt["affected_stations"],
+)
+
+print("Adding status mapping & correcting impacted metro lines successfully completed.")
+
+
+# %% Adding further status-related information to the data
+
+print("Adding further status-related information to the data in progress...")
 
 # Before proceeding, we check if a status is only valid between certain hours
 operation_fmt["confirm_validity"] = operation_fmt["valid_for_hours"].notna()
@@ -400,6 +460,13 @@ cols_to_drop = [
 ]
 operation_fmt = operation_fmt.drop(columns=cols_to_drop)
 
+# Ensuring we don't do double-counting of impacted stations
+# E.g. if a status is mapped to "M3_All" but the row does not
+# concern the M3 line, we remove that part of the string
+operation_fmt["affected_stations"] = operation_fmt.apply(
+    lambda row: confirm_affected_stations(row["affected_stations"], row["line"]), axis=1
+)
+
 # Adding dummies to measure impact on stations
 # First, we get lists of all relevant stations
 stations_all = mapping_stations["station"].unique()
@@ -435,19 +502,6 @@ operation_fmt["affected_stations"] = operation_fmt["affected_stations"].apply(
     lambda x: ", ".join(set(str(x).split(","))) if pd.notnull(x) else np.nan
 )
 
-
-"""
-# Finally, we check for impacts on explicitly named stations
-station_cols = []
-for station in stations_all:
-    station_str = station.lower()
-    station_str.replace(" ", "_")
-    station_cols.append(station_str)
-    operation_fmt["affected_" + station_str] = operation_fmt[
-        "affected_stations"
-    ].str.contains(station)
-"""
-
 # Imputing 0 for all missing values in numerical columns where status
 # is not "Unknown" (this reduces but does not entirely eliminate NANs)
 numeric_cols = operation_fmt.select_dtypes(include=[np.number]).columns.tolist()
@@ -478,7 +532,7 @@ operation_fmt["status_en_short"] = np.where(
 )
 
 
-print("Adding status-related information to the data successfully completed.")
+print("Adding further status-related information to the data successfully completed.")
 
 
 # %% Estimating the duration of each disruption
