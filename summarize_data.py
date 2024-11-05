@@ -4,7 +4,7 @@ Format & summarize data on the CPH Metro's operational status
 =============================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 04-11-2024
+Last meaningful update: 05-11-2024
 
 In this script, we import data on the Copenhagen Metro's operational
 status collected at different timestamps, then add some information
@@ -157,40 +157,70 @@ def apply_time_validation(df):
     return df
 
 
-# Function to avoid double-counting of affected stations
-def confirm_affected_stations(affected_stations: str, line: str) -> str:
+# Function to remove duplicate entries in a string column
+def rm_duplicate_str(text: str, sep: str = ", ") -> str:
     """
-    Checks whether the "affected_stations" column contains the values
-    of M1/M2/M3/M4 and if so, whether that information is consistent
-    with the information in the "line" column. If yes, then does nothing.
-    If no, then removes any irrelevant line names from "affected_stations".
+    Removes duplicate entries from a string representing
+    a list.
 
     Args:
-        affected_stations (str): single value in that column
-        line (str): single value in that column
+        text (str): input string containing duplicates
+        sep (str, optional): separator for the individual
+        items. Defaults to ", ".
 
     Returns:
-        str: verified data for "affected_stations"
+        str: output string without duplicates
+    """
+    # Check if the input is NaN
+    if pd.isna(text):
+        return np.nan
+
+    # Else, clean the string of duplicate entries
+    items = text.split(sep)
+    unique_items = set(items)
+    return sep.join(unique_items)
+
+
+# Function to validate the list of affected stations
+def validate_stations(stations_str: str, line: str, sep: str = ", ") -> str:
+    """
+    Validates the list of affected stations represented as
+    a list and removes stations that do not pertain to the
+    line that is represented in the raw data.
+
+    Args:
+        stations_str (str): string representation of a list
+        of affected stations, potentially containing superfluous
+        information
+        line (str): metroline (M1/M2/M3/M4)
+        sep (str): separator substring. Defaults to ", ".
+
+    Returns:
+        str: string containing only the stations relevant
+        for the respective metroline
     """
 
-    # Splitting the impacted stations into a list
-    affected_list = affected_stations.split(", ")
+    # Checking if the input is NaN
+    if pd.isna(stations_str):
+        return np.nan
 
-    # Valid line values to check
-    to_check = ["M1", "M2", "M3", "M4"]
-    # Filter to only include lines that are present in affected_stations
-    to_check = [ln for ln in to_check if ln + "_All" in affected_list]
+    # Comparison lists with valid stations per line
+    valid_stations = {
+        "M1": stations_m1,
+        "M2": stations_m2,
+        "M3": stations_m3,
+        "M4": stations_m4,
+    }
 
-    # Removing irrelevant lines
-    for line_str in to_check:
-        if line_str != line:
-            # Remove the line_str if it's not consistent with `line`
-            if line_str not in affected_list:
-                affected_list.remove(line_str + "_All")
+    # Converting the string of affected into a list
+    affected_list = stations_str.split(sep)
 
-    # Returning the outcome as a string
-    affected_new_str = ", ".join(affected_list)
-    return affected_new_str
+    # Performing the check
+    affected_list = [st for st in affected_list if st in valid_stations[line]]
+
+    # Converting back to a string and returning
+    affected_str = ", ".join(affected_list)
+    return affected_str
 
 
 # %% Ensuring we have rows for all datetimes covered by the data
@@ -460,13 +490,6 @@ cols_to_drop = [
 ]
 operation_fmt = operation_fmt.drop(columns=cols_to_drop)
 
-# Ensuring we don't do double-counting of impacted stations
-# E.g. if a status is mapped to "M3_All" but the row does not
-# concern the M3 line, we remove that part of the string
-operation_fmt["affected_stations"] = operation_fmt.apply(
-    lambda row: confirm_affected_stations(row["affected_stations"], row["line"]), axis=1
-)
-
 # Adding dummies to measure impact on stations
 # First, we get lists of all relevant stations
 stations_all = mapping_stations["station"].unique()
@@ -492,14 +515,33 @@ stations_dict = {
 # their full names are not written explicitly
 for key, val in zip(stations_dict.keys(), stations_dict.values()):
     operation_fmt["affected_stations"] = operation_fmt["affected_stations"] + np.where(
-        operation_fmt["affected_stations"].str.contains(key), ", " + val, ""
+        operation_fmt["affected_stations"].str.contains(key), ", " + val.strip(), ""
     )
+
 for key in stations_dict.keys():
-    operation_fmt["affected_stations"] = operation_fmt["affected_stations"].str.replace(
-        key + ", ", "", regex=False
-    )
+    operation_fmt["affected_stations"] = (
+        operation_fmt["affected_stations"]
+        .str.replace(key + ", ", "", regex=False)
+        .str.replace("  ", " ")
+        .str.strip()
+    )  # Remove double spaces and strip ends
+
 operation_fmt["affected_stations"] = operation_fmt["affected_stations"].apply(
-    lambda x: ", ".join(set(str(x).split(","))) if pd.notnull(x) else np.nan
+    lambda x: (
+        ", ".join(set(item.strip() for item in str(x).split(",")))
+        if pd.notnull(x)
+        else np.nan
+    )
+)
+
+# Ensuring we have no duplicate names in the stations string
+operation_fmt["affected_stations"] = operation_fmt["affected_stations"].apply(
+    rm_duplicate_str
+)
+
+# Verifying that impacted stations actually belong to the line
+operation_fmt["affected_stations"] = operation_fmt.apply(
+    lambda row: validate_stations(row["affected_stations"], row["line"]), axis=1
 )
 
 # Imputing 0 for all missing values in numerical columns where status
