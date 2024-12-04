@@ -23,7 +23,6 @@ import datetime as dt
 from datetime import time
 import os
 import sys
-import re
 
 # Importing custom functions for working with ADLS storage
 from azure_storage import (
