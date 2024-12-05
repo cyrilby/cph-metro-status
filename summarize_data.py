@@ -565,7 +565,7 @@ disruption_msg = ["Normal service", "Unknown", np.nan]
 operation_fmt["status_disruption"] = ~operation_fmt["status_en"].isin(disruption_msg)
 
 # Creating a short status column
-unchanged_msg = ["Normal service", "Unknown"]
+unchanged_msg = ["Normal service", "Unknown", "Closed for maintenance"]
 operation_fmt["status_en_short"] = np.where(
     operation_fmt["status_en"].isin(unchanged_msg),
     operation_fmt["status_en"],
