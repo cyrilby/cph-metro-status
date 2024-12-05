@@ -4,7 +4,7 @@ App visualizing the CPH Metro's operational status
 ==================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 09-08-2024
+Last meaningful update: 05-12-2024
 
 This script contains the source code of the Streamlit app accompanying
 the CPH metro scraper tool. In here, we create a series of data visualizations
@@ -20,11 +20,7 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import plotly.express as px
-import plotly.graph_objects as go
-import datetime as dt
 from plotly_calplot import calplot
-import io
-import os
 
 
 # %% Importing data for use in the app
@@ -809,7 +805,12 @@ def disruption_reasons():
     # Preparing data on selected reasons behind service disruptions
     # Note: this excludes maitenance and unspecified reason
     vars_for_group = ["reason"]
-    ignore_these = ["Unknown", "Unspecified", "Normal service", "Maintenance"]
+    ignore_these = [
+        "Unknown",
+        "Unspecified",
+        "Normal service",
+        "Closed for maintenance",
+    ]
     reasons_det_split = data_to_display[
         ~data_to_display["status_en_short"].isin(ignore_these)
     ].copy()
@@ -952,63 +953,401 @@ def disruption_impact():
         + downtime_msg
     )
 
-    # Preparing data on the daily likelihood of disruptions, incl. maintenance
-    vars_for_group = ["status_en_short", "weekday"]
-    by_day_with_mntn = data_to_display.copy()
-    by_day_with_mntn["status_en_short"] = np.where(
-        by_day_with_mntn["status_en"] == "Closed for maintenance",
-        by_day_with_mntn["status_en_short"],
-        "Normal service",
-    )
-    by_day_with_mntn["rows_for_status"] = by_day_with_mntn.groupby(vars_for_group)[
-        "date"
-    ].transform("count")
-    by_day_with_mntn["rows_for_day"] = by_day_with_mntn.groupby("weekday")[
-        "date"
-    ].transform("count")
-    by_day_with_mntn["status_pct"] = 100 * (
-        by_day_with_mntn["rows_for_status"] / by_day_with_mntn["rows_for_day"]
-    )
-    by_day_with_mntn["status_pct"] = np.round(by_day_with_mntn["status_pct"], 1)
-    by_day_with_mntn = by_day_with_mntn.drop_duplicates(subset=vars_for_group)
-    by_day_with_mntn = by_day_with_mntn[
-        by_day_with_mntn["status_en_short"] == "Disruption"
-    ].copy()
-    by_day_with_mntn = by_day_with_mntn.sort_values("weekday_n")
-    by_day_with_mntn = by_day_with_mntn.reset_index(drop=True)
+    # =================
+    # DAILY MAINTENANCE
+    # =================
 
-    # Getting the name of the most impacted day and the extent of the impact
-    if len(by_day_with_mntn):
-        most_imp_day_name = by_day_with_mntn["weekday"].iloc[0]
-        most_imp_day_val = by_day_with_mntn["status_pct"].iloc[0]
-        most_imp_day_val = round(most_imp_day_val, 1)
-    else:
-        most_imp_day_name, most_imp_day_val = "-", 0
-
-    # Preparing data on the daily likelihood of disruptions, excl. maintenance
+    # Preparing data on the daily likelihood of maintenance
     vars_for_group = ["status_en_short", "weekday"]
-    by_day_no_mntn = data_to_display.copy()
-    by_day_no_mntn["status_en_short"] = np.where(
-        by_day_no_mntn["status_en"] == "Closed for maintenance",
-        "Normal service",
-        by_day_no_mntn["status_en_short"],
-    )
-    by_day_no_mntn["rows_for_status"] = by_day_no_mntn.groupby(vars_for_group)[
+    by_day_chance_mntn = data_to_display.copy()
+    by_day_chance_mntn["rows_for_status"] = by_day_chance_mntn.groupby(vars_for_group)[
         "date"
     ].transform("count")
-    by_day_no_mntn["rows_for_day"] = by_day_no_mntn.groupby("weekday")[
+    by_day_chance_mntn["rows_for_day"] = by_day_chance_mntn.groupby("weekday")[
         "date"
     ].transform("count")
-    by_day_no_mntn["status_pct"] = 100 * (
-        by_day_no_mntn["rows_for_status"] / by_day_no_mntn["rows_for_day"]
+    by_day_chance_mntn["status_pct"] = 100 * (
+        by_day_chance_mntn["rows_for_status"] / by_day_chance_mntn["rows_for_day"]
     )
-    by_day_no_mntn["status_pct"] = np.round(by_day_no_mntn["status_pct"], 1)
-    by_day_no_mntn = by_day_no_mntn.drop_duplicates(vars_for_group)
-    by_day_no_mntn = by_day_no_mntn[
-        by_day_no_mntn["status_en_short"] == "Disruption"
+    by_day_chance_mntn["status_pct"] = np.round(by_day_chance_mntn["status_pct"], 1)
+    by_day_chance_mntn = by_day_chance_mntn.drop_duplicates(subset=vars_for_group)
+    by_day_chance_mntn = by_day_chance_mntn[
+        by_day_chance_mntn["status_en_short"] == "Closed for maintenance"
     ].copy()
-    by_day_no_mntn = by_day_no_mntn.sort_values("weekday_n")
-    by_day_no_mntn = by_day_no_mntn.reset_index(drop=True)
+    by_day_chance_mntn = by_day_chance_mntn.sort_values("weekday_n")
+    by_day_chance_mntn = by_day_chance_mntn.reset_index(drop=True)
+
+    # Creating a bar chart with the daily likelihood of maintenance
+    chart_by_day_chance_mntn = px.bar(
+        by_day_chance_mntn,
+        x="weekday",
+        y="status_pct",
+    )
+    chart_by_day_chance_mntn.update_layout(
+        title_text=f"Chance (%) of planned maintenance between {selected_period} by weekday"
+    )
+    chart_by_day_chance_mntn.update_xaxes(title_text="Weekday")
+    chart_by_day_chance_mntn.update_yaxes(title_text="% chance of disruption")
+
+    # Preparing data on the daily distribution of maintenance
+    vars_for_group = ["weekday"]
+    by_day_dist_mntn = data_to_display[
+        data_to_display["status_en"] == "Closed for maintenance"
+    ].copy()
+    by_day_dist_mntn["rows_for_status"] = by_day_dist_mntn.groupby(vars_for_group)[
+        "date"
+    ].transform("count")
+    by_day_dist_mntn["status_pct"] = 100 * (
+        by_day_dist_mntn["rows_for_status"] / len(by_day_dist_mntn)
+    )
+    by_day_dist_mntn["status_pct"] = np.round(by_day_dist_mntn["status_pct"], 1)
+    by_day_dist_mntn = by_day_dist_mntn.drop_duplicates(vars_for_group)
+    by_day_dist_mntn = by_day_dist_mntn.sort_values("rows_for_status")
+    by_day_dist_mntn = by_day_dist_mntn.reset_index(drop=True)
+
+    # Creating a doughnut chart with maintenance split by day
+    chart_by_day_dist_mntn = px.pie(
+        by_day_dist_mntn, values="status_pct", names="weekday", hole=0.45
+    )
+    chart_by_day_dist_mntn.update_layout(
+        title_text=f"Metro planned maintenance during the last {n_days} days split by weekday",
+        legend_title="",
+    )
+
+    # =================
+    # DAILY DISRUPTIONS
+    # =================
+
+    # Preparing data on the daily likelihood of disruptions
+    vars_for_group = ["status_en_short", "weekday"]
+    by_day_chance_dsrpt = data_to_display.copy()
+    by_day_chance_dsrpt["rows_for_status"] = by_day_chance_dsrpt.groupby(
+        vars_for_group
+    )["date"].transform("count")
+    by_day_chance_dsrpt["rows_for_day"] = by_day_chance_dsrpt.groupby("weekday")[
+        "date"
+    ].transform("count")
+    by_day_chance_dsrpt["status_pct"] = 100 * (
+        by_day_chance_dsrpt["rows_for_status"] / by_day_chance_dsrpt["rows_for_day"]
+    )
+    by_day_chance_dsrpt["status_pct"] = np.round(by_day_chance_dsrpt["status_pct"], 1)
+    by_day_chance_dsrpt = by_day_chance_dsrpt.drop_duplicates(vars_for_group)
+    by_day_chance_dsrpt = by_day_chance_dsrpt[
+        by_day_chance_dsrpt["status_en_short"] == "Disruption"
+    ].copy()
+    by_day_chance_dsrpt = by_day_chance_dsrpt.sort_values("weekday_n")
+    by_day_chance_dsrpt = by_day_chance_dsrpt.reset_index(drop=True)
+
+    # Preparing data on the daily distribution of disruptions
+    vars_for_group = ["weekday"]
+    ignore_these = ["Unknown", "Normal service", "Closed for maintenance"]
+    by_day_dist_dsrpt = data_to_display[
+        ~data_to_display["status_en_short"].isin(ignore_these)
+    ].copy()
+    by_day_dist_dsrpt["rows_for_status"] = by_day_dist_dsrpt.groupby(vars_for_group)[
+        "date"
+    ].transform("count")
+    by_day_dist_dsrpt["status_pct"] = 100 * (
+        by_day_dist_dsrpt["rows_for_status"] / len(by_day_dist_dsrpt)
+    )
+    by_day_dist_dsrpt["status_pct"] = np.round(by_day_dist_dsrpt["status_pct"], 1)
+    by_day_dist_dsrpt = by_day_dist_dsrpt.drop_duplicates(vars_for_group)
+    by_day_dist_dsrpt = by_day_dist_dsrpt.sort_values("rows_for_status")
+    by_day_dist_dsrpt = by_day_dist_dsrpt.reset_index(drop=True)
+
+    # Creating a bar chart with the daily likelihood of unplanned disruptions
+    chart_by_day_chance_dsrpt = px.bar(
+        by_day_chance_dsrpt,
+        x="weekday",
+        y="status_pct",
+    )
+    chart_by_day_chance_dsrpt.update_layout(
+        title_text=f"Chance (%) of unplanned disruptions between {selected_period} by weekday"
+    )
+    chart_by_day_chance_dsrpt.update_xaxes(title_text="Weekday")
+    chart_by_day_chance_dsrpt.update_yaxes(title_text="% chance of disruption")
+
+    # Creating a doughnut chart with disruptions split by day
+    chart_by_day_dist_dsrpt = px.pie(
+        by_day_dist_dsrpt, values="status_pct", names="weekday", hole=0.45
+    )
+    chart_by_day_dist_dsrpt.update_layout(
+        title_text=f"Metro unplanned disruptions during the last {n_days} days split by weekday",
+        legend_title="",
+    )
+
+    # ==================
+    # HOURLY MAINTENANCE
+    # ==================
+
+    # Preparing data on the hourly likelihood of maintenance
+    vars_for_group = ["status_en_short", "time_period"]
+    by_period_chance_mntn = data_to_display.copy()
+
+    by_period_chance_mntn["rows_for_status"] = by_period_chance_mntn.groupby(
+        vars_for_group
+    )["date"].transform("count")
+    by_period_chance_mntn["rows_for_period"] = by_period_chance_mntn.groupby(
+        "time_period"
+    )["date"].transform("count")
+    by_period_chance_mntn["status_pct"] = 100 * (
+        by_period_chance_mntn["rows_for_status"]
+        / by_period_chance_mntn["rows_for_period"]
+    )
+    by_period_chance_mntn["status_pct"] = np.round(
+        by_period_chance_mntn["status_pct"], 1
+    )
+    by_period_chance_mntn = by_period_chance_mntn.drop_duplicates(subset=vars_for_group)
+    by_period_chance_mntn = by_period_chance_mntn[
+        by_period_chance_mntn["status_en_short"] == "Closed for maintenance"
+    ].copy()
+    by_period_chance_mntn = by_period_chance_mntn.sort_values(
+        "time_period", ascending=False
+    )
+    by_period_chance_mntn = by_period_chance_mntn.reset_index(drop=True)
+
+    # Preparing data on the hourly distribution of maintenance
+    # (as split by a more detailed definition of day times)
+    vars_for_group = ["time_period"]
+    by_period_dist_mntn = data_to_display[
+        data_to_display["status_en"] == "Closed for maintenance"
+    ].copy()
+    by_period_dist_mntn["rows_for_status"] = by_period_dist_mntn.groupby(
+        vars_for_group
+    )["date"].transform("count")
+    by_period_dist_mntn["status_pct"] = 100 * (
+        by_period_dist_mntn["rows_for_status"] / len(by_period_dist_mntn)
+    )
+    by_period_dist_mntn["status_pct"] = np.round(by_period_dist_mntn["status_pct"], 1)
+    by_period_dist_mntn = by_period_dist_mntn.drop_duplicates(vars_for_group)
+    by_period_dist_mntn = by_period_dist_mntn.sort_values("rows_for_status")
+    by_period_dist_mntn = by_period_dist_mntn.reset_index(drop=True)
+
+    # Creating a bar chart with the hourly likelihood of maintenance
+    chart_by_period_chance_mntn = px.bar(
+        by_period_chance_mntn,
+        y="time_period",
+        x="status_pct",
+    )
+    chart_by_period_chance_mntn.update_layout(
+        title_text=f"Chance (%) of planned maintenance between {selected_period} by time period"
+    )
+    chart_by_period_chance_mntn.update_yaxes(title_text="Time period")
+    chart_by_period_chance_mntn.update_xaxes(title_text="% chance of disruption")
+
+    # Creating a doughnut chart with maintenance split by hour
+    chart_by_period_dist_mntn = px.pie(
+        by_period_dist_mntn, values="status_pct", names="time_period", hole=0.45
+    )
+    chart_by_period_dist_mntn.update_layout(
+        title_text=f"Metro planned maintenance during the last {n_days} days split by time of day",
+        legend_title="",
+    )
+
+    # ==================
+    # HOURLY DISRUPTIONS
+    # ==================
+
+    # Preparing data on the hourly likelihood of disruptions
+    vars_for_group = ["status_en_short", "time_period"]
+    by_period_chance_dsrpt = data_to_display.copy()
+    by_period_chance_dsrpt["rows_for_status"] = by_period_chance_dsrpt.groupby(
+        vars_for_group
+    )["date"].transform("count")
+    by_period_chance_dsrpt["rows_for_period"] = by_period_chance_dsrpt.groupby(
+        "time_period"
+    )["date"].transform("count")
+    by_period_chance_dsrpt["status_pct"] = 100 * (
+        by_period_chance_dsrpt["rows_for_status"]
+        / by_period_chance_dsrpt["rows_for_period"]
+    )
+    by_period_chance_dsrpt["status_pct"] = np.round(
+        by_period_chance_dsrpt["status_pct"], 1
+    )
+    by_period_chance_dsrpt = by_period_chance_dsrpt.drop_duplicates(vars_for_group)
+    by_period_chance_dsrpt = by_period_chance_dsrpt[
+        by_period_chance_dsrpt["status_en_short"] == "Disruption"
+    ].copy()
+    by_period_chance_dsrpt = by_period_chance_dsrpt.sort_values(
+        "time_period", ascending=False
+    )
+    by_period_chance_dsrpt = by_period_chance_dsrpt.reset_index(drop=True)
+
+    # Preparing data on the hourly distribution of disruptions
+    # (as split by a more detailed definition of day times)
+    # (excluding planned maintenance)
+    vars_for_group = ["time_period"]
+    ignore_these = ["Unknown", "Normal service", "Closed for maintenance"]
+    by_period_dist_dsrpt = data_to_display[
+        ~data_to_display["status_en_short"].isin(ignore_these)
+    ].copy()
+    by_period_dist_dsrpt["rows_for_status"] = by_period_dist_dsrpt.groupby(
+        vars_for_group
+    )["date"].transform("count")
+    by_period_dist_dsrpt["status_pct"] = 100 * (
+        by_period_dist_dsrpt["rows_for_status"] / len(by_period_dist_dsrpt)
+    )
+    by_period_dist_dsrpt["status_pct"] = np.round(by_period_dist_dsrpt["status_pct"], 1)
+    by_period_dist_dsrpt = by_period_dist_dsrpt.drop_duplicates(vars_for_group)
+    by_period_dist_dsrpt = by_period_dist_dsrpt.sort_values("rows_for_status")
+    by_period_dist_dsrpt = by_period_dist_dsrpt.reset_index(drop=True)
+
+    # Creating a bar chart with the hourly likelihood of disruptions
+    chart_by_period_chance_dsrpt = px.bar(
+        by_period_chance_dsrpt,
+        y="time_period",
+        x="status_pct",
+    )
+    chart_by_period_chance_dsrpt.update_layout(
+        title_text=f"Chance (%) of unplanned disruptions between {selected_period} by time period"
+    )
+    chart_by_period_chance_dsrpt.update_yaxes(title_text="Time period")
+    chart_by_period_chance_dsrpt.update_xaxes(title_text="% chance of disruption")
+
+    # Creating a doughnut chart with disruptions split by hour
+    chart_by_period_dist_dsprt = px.pie(
+        by_period_dist_dsrpt, values="status_pct", names="time_period", hole=0.45
+    )
+    chart_by_period_dist_dsprt.update_layout(
+        title_text=f"Metro service disruption during the last {n_days} days split by time of day",
+        legend_title="",
+    )
+
+    # =====================
+    # RUSH HOUR MAINTENANCE
+    # =====================
+
+    # Preparing data on the rush-hour likelihood of maintenance
+    vars_for_group = ["status_en_short", "official_rush_hour"]
+    by_rush_chance_mntn = data_to_display.copy()
+
+    by_rush_chance_mntn["rows_for_status"] = by_rush_chance_mntn.groupby(
+        vars_for_group
+    )["date"].transform("count")
+    by_rush_chance_mntn["rows_for_period"] = by_rush_chance_mntn.groupby(
+        "official_rush_hour"
+    )["date"].transform("count")
+    by_rush_chance_mntn["status_pct"] = 100 * (
+        by_rush_chance_mntn["rows_for_status"] / by_rush_chance_mntn["rows_for_period"]
+    )
+    by_rush_chance_mntn["status_pct"] = np.round(by_rush_chance_mntn["status_pct"], 1)
+    by_rush_chance_mntn = by_rush_chance_mntn.drop_duplicates(subset=vars_for_group)
+    by_rush_chance_mntn = by_rush_chance_mntn[
+        by_rush_chance_mntn["status_en_short"] == "Closed for maintenance"
+    ].copy()
+    by_rush_chance_mntn = by_rush_chance_mntn.sort_values(
+        "official_rush_hour", ascending=False
+    )
+    by_rush_chance_mntn = by_rush_chance_mntn.reset_index(drop=True)
+
+    # Preparing data on the rush-hour distr of maintenance
+    # (as split by a more detailed definition of day times)
+    vars_for_group = ["official_rush_hour"]
+    by_rush_dist_mntn = data_to_display[
+        data_to_display["status_en"] == "Closed for maintenance"
+    ].copy()
+    by_rush_dist_mntn["rows_for_status"] = by_rush_dist_mntn.groupby(vars_for_group)[
+        "date"
+    ].transform("count")
+    by_rush_dist_mntn["status_pct"] = 100 * (
+        by_rush_dist_mntn["rows_for_status"] / len(by_rush_dist_mntn)
+    )
+    by_rush_dist_mntn["status_pct"] = np.round(by_rush_dist_mntn["status_pct"], 1)
+    by_rush_dist_mntn = by_rush_dist_mntn.drop_duplicates(vars_for_group)
+    by_rush_dist_mntn = by_rush_dist_mntn.sort_values("rows_for_status")
+    by_rush_dist_mntn = by_rush_dist_mntn.reset_index(drop=True)
+
+    # Creating a bar chart with the likelihood of maintenance by rush hour
+    chart_by_rush_chance_mntn = px.bar(
+        by_rush_chance_mntn,
+        y="official_rush_hour",
+        x="status_pct",
+    )
+    chart_by_rush_chance_mntn.update_layout(
+        title_text=f"Chance (%) of planned maintenance between {selected_period} by rush hour type"
+    )
+    chart_by_rush_chance_mntn.update_yaxes(title_text="Time period")
+    chart_by_rush_chance_mntn.update_xaxes(title_text="% chance of disruption")
+
+    # Creating a doughnut chart with maintenance split by rush hpur
+    chart_by_rush_dist_mntn = px.pie(
+        by_rush_dist_mntn, values="status_pct", names="official_rush_hour", hole=0.45
+    )
+    chart_by_rush_dist_mntn.update_layout(
+        title_text=f"Metro planned maintenance during the last {n_days} days split by rush hour type",
+        legend_title="",
+    )
+
+    # =====================
+    # RUSH HOUR DISRUPTIONS
+    # =====================
+
+    # Preparing data on the rush-hour likelihood of disruptions
+    vars_for_group = ["status_en_short", "official_rush_hour"]
+    by_rush_chance_dsrpt = data_to_display.copy()
+    by_rush_chance_dsrpt["rows_for_status"] = by_rush_chance_dsrpt.groupby(
+        vars_for_group
+    )["date"].transform("count")
+    by_rush_chance_dsrpt["rows_for_period"] = by_rush_chance_dsrpt.groupby(
+        "official_rush_hour"
+    )["date"].transform("count")
+    by_rush_chance_dsrpt["status_pct"] = 100 * (
+        by_rush_chance_dsrpt["rows_for_status"]
+        / by_rush_chance_dsrpt["rows_for_period"]
+    )
+    by_rush_chance_dsrpt["status_pct"] = np.round(by_rush_chance_dsrpt["status_pct"], 1)
+    by_rush_chance_dsrpt = by_rush_chance_dsrpt.drop_duplicates(vars_for_group)
+    by_rush_chance_dsrpt = by_rush_chance_dsrpt[
+        by_rush_chance_dsrpt["status_en_short"] == "Disruption"
+    ].copy()
+    by_rush_chance_dsrpt = by_rush_chance_dsrpt.sort_values(
+        "official_rush_hour", ascending=False
+    )
+    by_rush_chance_dsrpt = by_rush_chance_dsrpt.reset_index(drop=True)
+
+    # Preparing data on the rush-hour distr of disruptions
+    # (as split by a more detailed definition of day times)
+    # (excluding planned maintenance)
+    vars_for_group = ["official_rush_hour"]
+    ignore_these = ["Unknown", "Normal service", "Closed for maintenance"]
+    by_rush_dist_dsrpt = data_to_display[
+        ~data_to_display["status_en_short"].isin(ignore_these)
+    ].copy()
+    by_rush_dist_dsrpt["rows_for_status"] = by_rush_dist_dsrpt.groupby(vars_for_group)[
+        "date"
+    ].transform("count")
+    by_rush_dist_dsrpt["status_pct"] = 100 * (
+        by_rush_dist_dsrpt["rows_for_status"] / len(by_rush_dist_dsrpt)
+    )
+    by_rush_dist_dsrpt["status_pct"] = np.round(by_rush_dist_dsrpt["status_pct"], 1)
+    by_rush_dist_dsrpt = by_rush_dist_dsrpt.drop_duplicates(vars_for_group)
+    by_rush_dist_dsrpt = by_rush_dist_dsrpt.sort_values("rows_for_status")
+    by_rush_dist_dsrpt = by_rush_dist_dsrpt.reset_index(drop=True)
+
+    # Creating a bar chart with the rush-hour likelihood of disruptions
+    chart_by_rush_chance_dsrpt = px.bar(
+        by_rush_chance_dsrpt,
+        y="official_rush_hour",
+        x="status_pct",
+    )
+    chart_by_rush_chance_dsrpt.update_layout(
+        title_text=f"Chance (%) of unplanned disruptions between {selected_period} by rush hour type"
+    )
+    chart_by_rush_chance_dsrpt.update_yaxes(title_text="Time period")
+    chart_by_rush_chance_dsrpt.update_xaxes(title_text="% chance of disruption")
+
+    # Creating a doughnut chart with disruptions split by rush hour
+    chart_by_rush_dist_dsprt = px.pie(
+        by_rush_dist_dsrpt, values="status_pct", names="official_rush_hour", hole=0.45
+    )
+    chart_by_rush_dist_dsprt.update_layout(
+        title_text=f"Metro service disruption during the last {n_days} days split by rush hour type",
+        legend_title="",
+    )
+
+    # =================
+    # AFFECTED STATIONS
+    # =================
 
     # Preparing data on the 10 most impacted stations
     most_impacted = st_data_to_display[
@@ -1037,30 +1376,6 @@ def disruption_impact():
     least_impacted = least_impacted.iloc[:10]
     least_impacted = least_impacted.sort_values("n_times_affected", ascending=False)
 
-    # Creating a bar chart with the daily likelihood of all kinds of disruptions
-    chart_by_day_w_mntn = px.bar(
-        by_day_with_mntn,
-        x="weekday",
-        y="status_pct",
-    )
-    chart_by_day_w_mntn.update_layout(
-        title_text=f"Occurrence (%) of planned disruptions between {selected_period} by weekday"
-    )
-    chart_by_day_w_mntn.update_xaxes(title_text="Weekday")
-    chart_by_day_w_mntn.update_yaxes(title_text="% chance of disruption")
-
-    # Creating a bar chart with the daily likelihood of unplanned disruptions
-    chart_by_day_no_mntn = px.bar(
-        by_day_no_mntn,
-        x="weekday",
-        y="status_pct",
-    )
-    chart_by_day_no_mntn.update_layout(
-        title_text=f"Occurrence (%) of unplanned disruptions between {selected_period} by weekday"
-    )
-    chart_by_day_no_mntn.update_xaxes(title_text="Weekday")
-    chart_by_day_no_mntn.update_yaxes(title_text="% chance of disruption")
-
     # Creating a bar chart with the most often disrupted stations
     chart_stations_most = px.bar(
         most_impacted,
@@ -1085,31 +1400,40 @@ def disruption_impact():
     chart_stations_least.update_xaxes(title_text="Number of records with disruption")
     chart_stations_least.update_yaxes(title_text="Station")
 
+    # =========== CHART DESCRIPTIONS ===========
     # Preparing messages describing the charts
-    w_mntn_desc = """The chart below shows the daily frequency at which **planned
-    disruptions** (i.e. service stops due to maintenance) occur throughout the week.
-    As such, it gives an insight into which days maintenance is most likely to
-    take place on, enabling us to plan our journey using alternative means of
-    transport:"""
-    no_mntn_desc = """The chart below shows the daily frequency at which **unplanned
-    disruptions** (e.g. due to unexpected technical issues) occur throughout the week.
-    As such, it gives an insight into which days are most plagued by service
-    issues, enabling us to plan our journey using alternative means of
-    transport:"""
-    st_most_desc = """The chart below lists the top 10 metro stations most frequently
-    impacted by service disruptions. The number shown is the total number of records
-    in the data where a disruption at the station was recorded (service status is
-    checked once every 10 minutes). As such, it can be useful in finding out which
-    stations to avoid so as to minimize the likelihood of suffering from service
-    stops. *Please note* that as the names of impacted stations are not always
-    explicitly mentioned in the service messages, the actual counts may be higher
-    than those presented on the chart:"""
-    st_least_desc = """The chart below lists the 10 metro stations least often
-    impacted by service disruptions. The number shown is the total number of records
-    in the data where a disruption at the station was recorded (service status is
-    checked once every 10 minutes). *Please note* that as the names of impacted
-    stations are not always explicitly mentioned in the service messages,
-    the actual counts may be higher than those presented on the chart:"""
+    chance_dist_disclaimer = """**Please note** that the numbers from the two charts above may resemble each other but may not be entirely the same. This is due to the fact that the calculations behind them use different bases of comparison."""
+    rush_disclaimer = """Please note that the classification used is a custom implementation. You can find charts using the Metro's official definition of rush hour further down this page."""
+    stations_disclaimer = """**Please note** that as the names of impacted stations are not always explicitly mentioned in the service messages, the actual counts may be higher than those presented on the chart"""
+
+    desc_mntn_chance_day = """The chart below shows the **chance that planned maintenance** events occur on any given day of the week. In other words, it answers questions such as *How likely is it that maintenance work will be carried out on a Monday?*:"""
+    desc_mntn_dist_day = """The chart below shows the **number of planned maintenance** events split by weekday. It allows us to answer questions such as *How many of all maintenance events took place on Monday, relative to other days of the week?*:"""
+    desc_dsrpt_chance_day = """The chart below shows the **chance that unplanned disruptions** occur on any given day of the week. In other words, it answers questions such as *How likely is it that a service disruption will take place on a Monday?*:"""
+    desc_dsrpt_dist_day = """The chart below shows the **number of unplanned disruptions** split by weekday. It allows us to answer questions such as *How many of all service disruptions took place on Monday, relative to other days of the week?*:"""
+
+    desc_dsrpt_chance_period = """The chart below shows the **chance that unplanned interruptions** occur at any given time during the day. In other words, it answers questions such as *How likely is it that a service disruption will take place during early mornings/early afternoons?*:"""
+    desc_mntn_chance_period = """The chart below shows the **chance that planned maintenance** events occur at any given time during the day. In other words, it answers questions such as *How likely is it that maintenance work will be carried out in late evenings/during the night?*:"""
+    desc_mntn_dist_period = """The chart below shows the **number of planned maintenance** events split by time of day. It allows us to answer questions such as *How many of all maintenance events took place during late evenings, relative to other times of the day?*:"""
+    desc_dsrpt_dist_period = """The chart below shows the **number of unplanned disruptions** split by time of day. It allows us to answer questions such as *How many of all service disruptions took place during late evenings, relative to other times of the day?*:"""
+
+    desc_dsrpt_chance_rush = """The chart below shows the **chance that unplanned interruptions** occur during what the Metro team officially defines as rush hours. In other words, it answers questions such as *How likely is it that a service disruption will take place during the official morning/afternoon rush hours?*:"""
+    desc_mntn_chance_rush = """The chart below shows the **chance that planned maintenance** events occur during what the Metro team officially defines as rush hours. In other words, it answers questions such as *How likely is it that maintenance work will be carried out during the official morning/afternoon rush hours?*:"""
+    desc_mntn_dist_rush = """The chart below shows the **number of planned maintenance** events split by the Metro team's official definition of rush hour. It allows us to answer questions such as *How many of all maintenance events took place during morning/afternoon rush hours, relative to other times of the day?*:"""
+    desc_dsrpt_dist_rush = """The chart below shows the **number of unplanned disruptions** split by the Metro team's official definition of rush hour. It allows us to answer questions such as *How many of all service disruptions took place during morning/afternoon rush hours, relative to other times of the day?*:"""
+
+    desc_most_impacted = """The chart below lists the top 10 metro stations **most frequently impacted by service disruptions**. The number shown is the total number of records in the data where a disruption at the station was recorded:"""
+    desc_less_impacted = """The chart below lists the 10 metro stations **least often impacted by service disruptions**. The number shown is the total number of records in the data where a disruption at the station was recorded:"""
+
+    # Getting the name of the most impacted day and the extent of the impact
+    if len(by_day_chance_mntn):
+        tmp_day = by_day_chance_dsrpt[
+            by_day_chance_dsrpt["status_pct"] == by_day_chance_dsrpt["status_pct"].max()
+        ]
+        most_imp_day_name = tmp_day["weekday"].iloc[0]
+        most_imp_day_val = tmp_day["status_pct"].iloc[0]
+        most_imp_day_val = round(most_imp_day_val, 1)
+    else:
+        most_imp_day_name, most_imp_day_val = "-", 0
 
     # Plotting the elements in the correct order,
     # starting with KPIs on top of the page and proceeding with charts
@@ -1117,9 +1441,7 @@ def disruption_impact():
         st.warning(mapping_warning)
     st.markdown(
         f"""This page contains insights on the **impact caused by service disruptions
-            between {selected_period}**, including the frequency with each they occur
-            throughout the week, and the names of the most and least
-            impacted stations by the disruptions."""
+            between {selected_period}**, including both planned maintenance and unplanned disruptions. You can view the data by weekday, time of day and the names of the most/least affected stations."""
     )
 
     metric1, metric2, metric3 = st.columns(3)
@@ -1127,25 +1449,63 @@ def disruption_impact():
     metric2.metric("Avg disruption % on that day", str(most_imp_day_val) + "%")
     metric3.metric("Most impacted station", str(most_imp_station_name))
 
-    st.subheader("Daily frequency of planned disruptions", divider="rainbow")
-    st.markdown(w_mntn_desc)
-    plot_or_not(chart_by_day_w_mntn, by_day_with_mntn)
-    # st.plotly_chart(chart_by_day_w_mntn)
+    st.subheader("Daily impact of unplanned disruptions", divider="rainbow")
+    st.markdown(desc_dsrpt_chance_day)
+    plot_or_not(chart_by_day_chance_dsrpt, by_day_chance_dsrpt)
+    st.markdown(desc_dsrpt_dist_day)
+    plot_or_not(chart_by_day_dist_dsrpt, by_day_dist_dsrpt)
+    st.markdown(chance_dist_disclaimer)
 
-    st.subheader("Daily frequency of unplanned disruptions", divider="rainbow")
-    st.markdown(no_mntn_desc)
-    plot_or_not(chart_by_day_no_mntn, by_day_no_mntn)
-    # st.plotly_chart(chart_by_day_no_mntn)
+    st.subheader("Daily impact of planned maintenance", divider="rainbow")
+    st.markdown(desc_mntn_chance_day)
+    plot_or_not(chart_by_day_chance_mntn, by_day_chance_mntn)
+    st.markdown(desc_mntn_dist_day)
+    plot_or_not(chart_by_day_dist_mntn, by_day_dist_mntn)
+    st.markdown(chance_dist_disclaimer)
+
+    st.subheader("Hourly impact of unplanned disruptions", divider="rainbow")
+    st.markdown(desc_dsrpt_chance_period)
+    st.warning(rush_disclaimer)
+    plot_or_not(chart_by_period_chance_dsrpt, by_period_chance_dsrpt)
+    st.markdown(desc_dsrpt_dist_period)
+    plot_or_not(chart_by_period_dist_dsprt, by_period_dist_dsrpt)
+    st.markdown(chance_dist_disclaimer)
+
+    st.subheader("Hourly impact of planned maintenance", divider="rainbow")
+    st.markdown(desc_mntn_chance_period)
+    st.warning(rush_disclaimer)
+    plot_or_not(chart_by_period_chance_mntn, by_period_chance_mntn)
+    st.markdown(desc_mntn_dist_period)
+    plot_or_not(chart_by_period_dist_mntn, by_period_dist_mntn)
+    st.markdown(chance_dist_disclaimer)
+
+    st.subheader(
+        "Impact of unplanned disruptions during official rush hour", divider="rainbow"
+    )
+    st.markdown(desc_dsrpt_chance_rush)
+    plot_or_not(chart_by_rush_chance_dsrpt, by_rush_chance_dsrpt)
+    st.markdown(desc_dsrpt_dist_rush)
+    plot_or_not(chart_by_rush_dist_dsprt, by_rush_dist_dsrpt)
+    st.markdown(chance_dist_disclaimer)
+
+    st.subheader(
+        "Impact of planned maintenance during official rush hour", divider="rainbow"
+    )
+    st.markdown(desc_mntn_chance_rush)
+    plot_or_not(chart_by_rush_chance_mntn, by_rush_chance_mntn)
+    st.markdown(desc_mntn_dist_rush)
+    plot_or_not(chart_by_rush_dist_mntn, by_rush_dist_mntn)
+    st.markdown(chance_dist_disclaimer)
 
     st.subheader("Most impacted stations", divider="rainbow")
-    st.markdown(st_most_desc)
+    st.markdown(desc_most_impacted)
     plot_or_not(chart_stations_most, most_impacted)
-    # st.plotly_chart(chart_stations_most)
+    st.markdown(stations_disclaimer)
 
     st.subheader("Least impacted stations", divider="rainbow")
-    st.markdown(st_least_desc)
+    st.markdown(desc_less_impacted)
     plot_or_not(chart_stations_least, least_impacted)
-    # st.plotly_chart(chart_stations_least)
+    st.markdown(stations_disclaimer)
 
 
 # %% Page: daily history of service disruptions
@@ -1390,6 +1750,9 @@ def disruption_calc():
         calculations more relevant for your trip."""
     )
 
+    # Getting number of unique days in the data
+    n_days_hist = operation_fmt["date_in_last_n_days"].max()
+
     # Collecting input data from the user from custom sidebar filters
     selected_station = st.sidebar.selectbox(
         "Station", unique_stations, index=unique_stations.index("Kongens Nytorv")
@@ -1403,7 +1766,7 @@ def disruption_calc():
     selected_n_days = st.sidebar.select_slider(
         "Number of recent days to base the probability calculations off",
         n_possible_days,
-        value=30,  # last 30 days by default
+        value=n_days_hist,  # all historical data by default
     )
 
     # Aggregating the data by day, hour and station
