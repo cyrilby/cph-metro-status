@@ -4,7 +4,8 @@
 # Copenhagen metro operations monitoring tool
 
 * Author: kirilboyanovbg[at]gmail.com
-* Last meaningful update: 05-12-2024
+* Website: [mindgraph.dk](https://mindgraph.dk)
+* Last meaningful update: 06-12-2024
 
 This project is centered around automatically gathering data from the [Copenhagen Metro's website](https://m.dk) and monitoring its operations over time in order to find out how often (and when) things are most likely to break. To facilitate the communication of the insights gathered, the data is presented visually using a [Streamlit app](https://cph-metro.streamlit.app/).
 
