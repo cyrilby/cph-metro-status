@@ -4,7 +4,7 @@ App visualizing the CPH Metro's operational status
 ==================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 05-12-2024
+Last meaningful update: 06-12-2024
 
 This script contains the source code of the Streamlit app accompanying
 the CPH metro scraper tool. In here, we create a series of data visualizations
@@ -21,6 +21,11 @@ import numpy as np
 import streamlit as st
 import plotly.express as px
 from plotly_calplot import calplot
+import yaml
+
+# Importing long text strings used in the app
+with open("text.yaml", "r", encoding="utf-8") as file:
+    text = yaml.safe_load(file)
 
 
 # %% Importing data for use in the app
@@ -107,23 +112,20 @@ if unmapped_msg_n:
 # Preparing a warning for the app's front page if there are unmapped entries
 if unmapped_msg_n:
     if unmapped_msg_date_min:
-        mapping_warning = f"""There are {unmapped_msg_n} metro status messages
-        that have not yet been classified in terms of their impact on service
-        status. This means that in the period {unmapped_msg_date_min}-
-        {unmapped_msg_date_max}, the numbers in the 'Unknown' category may be
-        overestimated and the numbers in the 'Normal service' and 'Disrupted
-        service' categories may be underestimated. The share of records impacted by 
-        this is lower than {unmappped_rows_pct}% across all historical data.
-        """
+        mapping_warning = text["warning_mapping_many_dates"]
+        mapping_warning = mapping_warning.format(
+            unmapped_msg_n=unmapped_msg_n,
+            unmapped_msg_date_min=unmapped_msg_date_min,
+            unmapped_msg_date_max=unmapped_msg_date_max,
+            unmappped_rows_pct=unmappped_rows_pct,
+        )
     else:
-        mapping_warning = f"""There are {unmapped_msg_n} metro status messages
-        that have not yet been classified in terms of their impact on service
-        status. This means that on {unmapped_msg_date_max}, the numbers in the
-        'Unknown' category may be overestimated and the numbers in the 'Normal
-        service' and 'Disrupted service' categories may be underestimated.
-        The share of records impacted by this is lower than {unmappped_rows_pct}%
-        across all historical data.
-        """
+        mapping_warning = text["warning_mapping_one_date"]
+        mapping_warning = mapping_warning.format(
+            unmapped_msg_n=unmapped_msg_n,
+            unmapped_msg_date_max=unmapped_msg_date_max,
+            unmappped_rows_pct=unmappped_rows_pct,
+        )
 else:
     mapping_warning = None
 
@@ -246,16 +248,14 @@ def deal_with_downtime(data_to_display: pd.DataFrame, selected_rows: list):
 
     # Generating a message reg. the presence of downtime for the end user
     if downtime_days > downtime_days_shown:
-        downtime_msg = f""" System downtime affecting {downtime_days} day(s)'
-        worth of data has been hidden from view. Please use the *'Showing data'*
-        slicer to show all data, including periods of system downtime."""
+        downtime_msg = text["downtime_msg_hidden"]
+        downtime_msg = downtime_msg.format(downtime_days=downtime_days)
     elif downtime_days:
-        downtime_msg = f""" System downtime has been detected in this period,
-        affecting {downtime_days} day(s)' worth of data. Please use
-         the *'Showing data'* slicer to exclude periods of downtime."""
+        downtime_msg = text["downtime_msg_shown"]
+        downtime_msg = downtime_msg.format(downtime_days=downtime_days)
     else:
-        downtime_msg = """No periods of system downtime have been detected in
-        this period, meaning that all available data is shown on charts etc."""
+        downtime_msg = downtime_msg = text["downtime_msg_none"]
+
     return data_to_display, downtime_msg
 
 
@@ -292,11 +292,8 @@ def plot_or_not(plot, df: pd.DataFrame):
     if len(df) >= 1:
         st.plotly_chart(plot)
     else:
-        st.warning(
-            """Warning: you have filtered the data to subsample which contains
-                   no data that can be shown on this chart. Please adjust your
-                   selection using the slicers in the sidebar to the left."""
-        )
+        warning_text = text["warning_chart_no_data"]
+        st.warning(warning_text)
 
 
 def colors_for_calplot(data: pd.DataFrame) -> dict:
@@ -349,16 +346,8 @@ def colors_for_calplot(data: pd.DataFrame) -> dict:
 # Informs the user of the app's purpose
 def show_homepage():
     st.header("Welcome to the CPH metro status app!")
-    st.markdown(
-        """This app presents information on the Copenhagen Metro's
-    **operational status over time**, allowing to measure the impact of the
-    disruptions caused to passengers on different lines, stations and different
-    times of day."""
-    )
-    st.markdown(
-        """**Please scroll down** to see the latest operational status
-    as well as learn how to make the best use of the app."""
-    )
+    st.markdown(text["home_msg_1"])
+    st.markdown(text["home_msg_2"])
     st.image(
         "resources/metro_map_with_stations.png"
     )  # image can be disabled in development phase
@@ -367,84 +356,40 @@ def show_homepage():
     st.subheader("Latest service status data", divider="rainbow")
     if mapping_warning:
         st.warning(mapping_warning)
-    st.markdown(
-        f"""The **latest data** on the CPH metro's service status were
-            collected on **{last_update_date} at {last_update_time}** o'clock.
-            A preview of the latest status for each line is shown below:"""
+
+    msg_text = text["home_msg_3"]
+    msg_text = msg_text.format(
+        last_update_date=last_update_date, last_update_time=last_update_time
     )
+    st.markdown(msg_text)
     st.dataframe(most_recent)
 
     # Displaying more info on how the app can help the user
     st.subheader("How this app can help you", divider="rainbow")
-    st.markdown(
-        """This app focuses on keeping track of the Copenhagen Metro's service
-        status and aggregating that data in meaningful ways, allowing you to
-        **find answers to questions such as**:
-        """
-    )
-    st.markdown(
-        f"""
-        - How often has the metro run according to schedule in the past (up to)
-        {n_days} days?
-        - How often has the metro experienced disruptions either due to
-        maintenance or unexpected issues?
-        - What were the main causes behind the disruptions that occurred
-        in the selected time period?
-        - Which days of the week saw the highest number of disruptions and which
-       stations were most impacted by them?
-       - Have there been any improvements/a worsening in the share of time
-       where the metro ran according to schedule in the selected time period?
-        """
-    )
+    st.markdown(text["home_msg_4"])
+    msg_text = text["home_msg_5"]
+    msg_text = msg_text.format(n_days=n_days)
+    st.markdown(msg_text)
 
     # Displaying more info on how to use the app
     st.subheader("How to use this app", divider="rainbow")
     st.markdown("This app consists of the following two panes:")
-    st.markdown(
-        """
-        - **The sidebar**: allows you to navigate between the different pages 
-        included in the app as well as to apply different filters on the data, such
-        as choosing how many days of data to include in the calculations that 
-        generate the data shown on the charts.
-        - **The main panel**: contains various charts, tables and text descriptions.
-        """
-    )
-    st.markdown(
-        "To **switch between different pages**, please click on the page title:"
-    )
+    st.markdown(text["home_msg_6"])
+    # st.markdown(
+    #     "To **switch between different pages**, please click on the page title:"
+    # )
     st.image("resources/pages_examples.PNG")
     st.markdown("You will then be redirected to the desired page.")
 
     # Displaying more info on how the user can filter the data
     st.subheader("How to apply filters to the data", divider="rainbow")
-    st.markdown(
-        """To **apply a filter to the data**, please click on the filter
-        you wish to apply and select the desired value(s). Please note that the
-        filter that lets you decide how many days of historical data to use in
-        the calculations supports *choosing only one value*. By default, it is set
-        to display the last 30 days:
-        """
-    )
+    st.markdown(text["home_msg_7"])
     st.image("resources/filter_recent_days.PNG")
-    st.markdown(
-        """All other filters support **choosing multiple values** at the
-        same time. By default, all values are kept:"""
-    )
+    st.markdown(text["home_msg_8"])
     st.image("resources/filter_lines.PNG")
-    st.markdown(
-        """**Please note** that if you filter the data too much or remove all
-        pre-made selections, there might not be enough data left to display on
-        the charts and the app may revert to selecting something for you.
-        Should that be the case, a **warning message** will be displayed
-        such as the one below:
-        """
-    )
+    st.markdown(text["home_msg_9"])
     st.image("resources/selection_warning.PNG")
-    st.markdown(
-        """To get rid of the warning, please revise your selection
-        or refresh the web page to start over.
-        """
-    )
+    st.markdown(text["home_msg_10"])
     st.divider()
     st.markdown("*Front page image source: Metroselskabet (www.m.dk)*")
 
@@ -601,14 +546,14 @@ def general_overview():
     overall_chart = px.pie(
         overall_split, values="status_pct", names="status_en_short", hole=0.45
     )
-    overall_chart.update_traces(textinfo="percent+label")
+    # overall_chart.update_traces(textinfo="percent+label") # adds data labels on chart
     overall_chart.update_layout(
         title_text=f"CPH metro service status during the last {n_days} days",
         legend_title="",
-        autosize=False,
-        width=500,
-        height=500,
-        margin=dict(l=50, r=50, b=100, t=100, pad=4),
+        # autosize=False,
+        # width=500,
+        # height=500,
+        # margin=dict(l=50, r=50, b=100, t=100, pad=4),
     )
 
     # Creating a doughnut chart with the detailed status split
@@ -636,42 +581,17 @@ def general_overview():
     )
 
     # Preparing messages describing the charts
-    overall_desc = """The chart below shows the overall split between normal service
-    operation, service disruptions and unknown status. As such, it indicates how
-    prevalent service disruptions have been in the selected period relative to
-    normal operation:"""
-    detailed_desc = """The chart below zooms in on cases where the metro did not
-    operate with a normal service and shows the split between the different kinds
-    of other service messages. As such, it allows to understand whether service
-    was impacted by e.g. planned maintenance, delays or a complete disruption:"""
-    cal_desc_1 = """The chart below shows the daily service reliability of the
-    Copenhagen metro. The **disruption score** plotted on the chart is
-    calculated in the following way:
-    """
-    cal_desc_2 = """
-    - 🟢 If service has been **running normally** or has been affected by planned
-    maintenance on any given day, then the disruption score will be 0 and
-    the day will be plotted with a **green background** on the chart.
-    - 🟡 If service has been affected by at least one **partial disruption** or
-    delay, then the disruption score will be 1 and the day will be plotted
-    with a **yellow background** on the chart.
-    - 🔴 If service has been affected by at least one **complete disruption** or
-    delay, then the disruption score will be 2 and the day will be plotted
-    with a **red background** on the chart.
-    - ⚪ If the web scraper tool has not been running due to unexpected system
-    downtime and no data is recorded, then the disruption score will be -1
-    and the day will be plotted with a **grey background** on the chart.
-    """
+    overall_desc = text["gen_overall_desc"]
+    detailed_desc = text["gen_detailed_desc"]
+    cal_desc = text["gen_cal_desc"]
 
     # Plotting the elements in the correct order,
     # starting with KPIs on top of the page and proceeding with charts
     if mapping_warning:
         st.warning(mapping_warning)
-    st.markdown(
-        f"""This page shows information on the **overall status of the metro
-        between {selected_period}**, including the share of the time where service
-        was running normally or with disruptions."""
-    )
+    msg_text = text["gen_page_desc"]
+    msg_text = msg_text.format(selected_period=selected_period)
+    st.markdown(msg_text)
 
     metric1, metric2, metric3 = st.columns(3)
     metric1.metric("Normal service, pct of time", str(pct_normal_service) + "%")
@@ -681,17 +601,14 @@ def general_overview():
     st.subheader("Overall service status", divider="rainbow")
     st.markdown(overall_desc)
     plot_or_not(overall_chart, overall_split)
-    # st.plotly_chart(overall_chart)
 
     st.subheader("Detailed service status", divider="rainbow")
     st.markdown(detailed_desc)
     plot_or_not(detailed_chart, detailed_split)
-    # st.plotly_chart(detailed_chart)
 
     # Plotting a calendar-based overview
     st.subheader("Daily service reliability", divider="rainbow")
-    st.markdown(cal_desc_1)
-    st.markdown(cal_desc_2)
+    st.markdown(cal_desc)
     plot_or_not(cal_fig, cal_data)
 
 
@@ -855,29 +772,17 @@ def disruption_reasons():
     )
 
     # Preparing messages describing the charts
-    status_desc = """The chart below presents the split between different kinds
-    of service disruptions, exclusive of normally running service and unknown
-    status. As such, it allows to understand whether service disruptions
-    manifested as e.g. planned maintenance, delays or a complete service stop:"""
-    reasons_desc = """The chart below shows the different reasons given by the
-    CPH metro team. As such, it gives an insight into whether service disruption
-    is mostly due to e.g. technical issues or something else. Please note that
-    a reason is not reported for all disruptions, which can inflate the relative
-    importance of the "Unspecified" factor:"""
-    reasons_det_desc = """The chart below presents all specified reasons behind
-    the various service disruption, exluding maintenance. As such, it allows us
-    to understand which areas the CPH metro should improve in to minimize the
-    occurrence of future disruptions:"""
+    status_desc = text["rsn_status_desc"]
+    reasons_desc = text["rsn_reasons_desc"]
+    reasons_det_desc = text["rsn_reasons_det_desc"]
 
     # Plotting the elements in the correct order,
     # starting with KPIs on top of the page and proceeding with charts
     if mapping_warning:
         st.warning(mapping_warning)
-    st.markdown(
-        f"""This page contains insights on the **kinds of service disruptions between
-            {selected_period}**, including the reasons behind those disruptions and
-            some the CPH metro team's major impediments to running a normal service."""
-    )
+    msg_text = text["rsn_page_desc"]
+    msg_text = msg_text.format(selected_period=selected_period)
+    st.markdown(msg_text)
 
     metric1, metric2, metric3 = st.columns(3)
     metric1.metric("Maintenance", str(pct_maintn) + "%")
@@ -887,16 +792,13 @@ def disruption_reasons():
     st.subheader("Kinds of disruptions", divider="rainbow")
     st.markdown(status_desc)
     plot_or_not(status_chart, detailed_status)
-    # st.plotly_chart(status_chart)
 
     st.subheader("Reasons behind service disruptions", divider="rainbow")
     st.markdown(reasons_desc)
     plot_or_not(reasons_chart, reasons_split)
-    # st.plotly_chart(reasons_chart)
 
     st.markdown(reasons_det_desc)
     plot_or_not(reasons_det_chart, reasons_det_split)
-    # st.plotly_chart(reasons_det_chart)
 
 
 # %% Page: service disruption impact
@@ -1401,28 +1303,23 @@ def disruption_impact():
     chart_stations_least.update_yaxes(title_text="Station")
 
     # =========== CHART DESCRIPTIONS ===========
-    # Preparing messages describing the charts
-    chance_dist_disclaimer = """**Please note** that the numbers from the two charts above may resemble each other but may not be entirely the same. This is due to the fact that the calculations behind them use different bases of comparison."""
-    rush_disclaimer = """Please note that the classification used is a custom implementation. You can find charts using the Metro's official definition of rush hour further down this page."""
-    stations_disclaimer = """**Please note** that as the names of impacted stations are not always explicitly mentioned in the service messages, the actual counts may be higher than those presented on the chart"""
-
-    desc_mntn_chance_day = """The chart below shows the **chance that planned maintenance** events occur on any given day of the week. In other words, it answers questions such as *How likely is it that maintenance work will be carried out on a Monday?*:"""
-    desc_mntn_dist_day = """The chart below shows the **number of planned maintenance** events split by weekday. It allows us to answer questions such as *How many of all maintenance events took place on Monday, relative to other days of the week?*:"""
-    desc_dsrpt_chance_day = """The chart below shows the **chance that unplanned disruptions** occur on any given day of the week. In other words, it answers questions such as *How likely is it that a service disruption will take place on a Monday?*:"""
-    desc_dsrpt_dist_day = """The chart below shows the **number of unplanned disruptions** split by weekday. It allows us to answer questions such as *How many of all service disruptions took place on Monday, relative to other days of the week?*:"""
-
-    desc_dsrpt_chance_period = """The chart below shows the **chance that unplanned interruptions** occur at any given time during the day. In other words, it answers questions such as *How likely is it that a service disruption will take place during early mornings/early afternoons?*:"""
-    desc_mntn_chance_period = """The chart below shows the **chance that planned maintenance** events occur at any given time during the day. In other words, it answers questions such as *How likely is it that maintenance work will be carried out in late evenings/during the night?*:"""
-    desc_mntn_dist_period = """The chart below shows the **number of planned maintenance** events split by time of day. It allows us to answer questions such as *How many of all maintenance events took place during late evenings, relative to other times of the day?*:"""
-    desc_dsrpt_dist_period = """The chart below shows the **number of unplanned disruptions** split by time of day. It allows us to answer questions such as *How many of all service disruptions took place during late evenings, relative to other times of the day?*:"""
-
-    desc_dsrpt_chance_rush = """The chart below shows the **chance that unplanned interruptions** occur during what the Metro team officially defines as rush hours. In other words, it answers questions such as *How likely is it that a service disruption will take place during the official morning/afternoon rush hours?*:"""
-    desc_mntn_chance_rush = """The chart below shows the **chance that planned maintenance** events occur during what the Metro team officially defines as rush hours. In other words, it answers questions such as *How likely is it that maintenance work will be carried out during the official morning/afternoon rush hours?*:"""
-    desc_mntn_dist_rush = """The chart below shows the **number of planned maintenance** events split by the Metro team's official definition of rush hour. It allows us to answer questions such as *How many of all maintenance events took place during morning/afternoon rush hours, relative to other times of the day?*:"""
-    desc_dsrpt_dist_rush = """The chart below shows the **number of unplanned disruptions** split by the Metro team's official definition of rush hour. It allows us to answer questions such as *How many of all service disruptions took place during morning/afternoon rush hours, relative to other times of the day?*:"""
-
-    desc_most_impacted = """The chart below lists the top 10 metro stations **most frequently impacted by service disruptions**. The number shown is the total number of records in the data where a disruption at the station was recorded:"""
-    desc_less_impacted = """The chart below lists the 10 metro stations **least often impacted by service disruptions**. The number shown is the total number of records in the data where a disruption at the station was recorded:"""
+    chance_dist_disclaimer = text["chance_dist_disclaimer"]
+    rush_disclaimer = text["rush_disclaimer"]
+    stations_disclaimer = text["stations_disclaimer"]
+    desc_mntn_chance_day = text["desc_mntn_chance_day"]
+    desc_mntn_dist_day = text["desc_mntn_dist_day"]
+    desc_dsrpt_chance_day = text["desc_dsrpt_chance_day"]
+    desc_dsrpt_dist_day = text["desc_dsrpt_dist_day"]
+    desc_dsrpt_chance_period = text["desc_dsrpt_chance_period"]
+    desc_mntn_chance_period = text["desc_mntn_chance_period"]
+    desc_mntn_dist_period = text["desc_mntn_dist_period"]
+    desc_dsrpt_dist_period = text["desc_dsrpt_dist_period"]
+    desc_dsrpt_chance_rush = text["desc_dsrpt_chance_rush"]
+    desc_mntn_chance_rush = text["desc_mntn_chance_rush"]
+    desc_mntn_dist_rush = text["desc_mntn_dist_rush"]
+    desc_dsrpt_dist_rush = text["desc_dsrpt_dist_rush"]
+    desc_most_impacted = text["desc_most_impacted"]
+    desc_less_impacted = text["desc_less_impacted"]
 
     # Getting the name of the most impacted day and the extent of the impact
     if len(by_day_chance_mntn):
@@ -1439,10 +1336,9 @@ def disruption_impact():
     # starting with KPIs on top of the page and proceeding with charts
     if mapping_warning:
         st.warning(mapping_warning)
-    st.markdown(
-        f"""This page contains insights on the **impact caused by service disruptions
-            between {selected_period}**, including both planned maintenance and unplanned disruptions. You can view the data by weekday, time of day and the names of the most/least affected stations."""
-    )
+    msg_text = text["imp_page_desc"]
+    msg_text = msg_text.format(selected_period=selected_period)
+    st.markdown(msg_text)
 
     metric1, metric2, metric3 = st.columns(3)
     metric1.metric("Most impacted day", str(most_imp_day_name))
@@ -1673,35 +1569,19 @@ def disruption_history():
     stations_chart.update_yaxes(title_text="Average number of stations impacted")
 
     # Preparing messages describing the charts
-    n_desc = """The chart below shows the number of unique service messages
-    that can be classified as disruptions. As such, it can be used as an indicator
-    of how many things went wrong on any given day:"""
-    pct_desc = """The chart below shows the % of the time where a service
-    message classified as disruption was displayed (checks are made once every 10
-    minutes). As such, it can be used as an indicator of approximately how much of
-    the day was plagued by disruptions relative to normally running service:"""
-    h_desc = """The chart below shows the average duration of the various service
-    disruptions measured in hours. As such, it can be used as an indicator of
-    whether things were broken for a relatively short time or not:"""
-    stations_desc_pct = """The chart below shows the average % of stations which were
-    impacted by disruptions in the given period. As such, it can be used to
-    evaluate the magnitude of the disruptions, however, it is important to note that
-    impacted stations are not always mentioned in the service messages, so the share
-    as presented below will probably be underestimated:"""
-    stations_desc = """The chart below shows essentially the *same information* but
-    rather than looking at the average percentage of impacted stations, we look at
-    the actual number:"""
+    n_desc = text["hist_n_desc"]
+    pct_desc = text["hist_pct_desc"]
+    h_desc = text["hist_h_desc"]
+    stations_desc_pct = text["hist_stations_desc_pct"]
+    stations_desc = text["hist_stations_desc"]
 
     # Plotting the elements in the correct order,
     # starting with KPIs on top of the page and proceeding with charts
     if mapping_warning:
         st.warning(mapping_warning)
-    st.markdown(
-        f"""This page shows a full daily history of **service disruptions between
-            {selected_period}**, including the share of the time where service
-            was running normally, the number and duration of all disruptions
-            as well as how many stations were impacted by the disruptions."""
-    )
+    msg_text = text["hist_page_desc"]
+    msg_text = msg_text.format(selected_period=selected_period)
+    st.markdown(msg_text)
 
     metric1, metric2, metric3 = st.columns(3)
     metric1.metric("Total disruptions", str(total_disruptions))
@@ -1711,26 +1591,21 @@ def disruption_history():
     st.subheader("Number of disruptions", divider="rainbow")
     st.markdown(n_desc)
     plot_or_not(n_disr_chart, daily_disruption)
-    # st.plotly_chart(n_disr_chart)
 
     st.subheader("Disruptions as % of time", divider="rainbow")
     st.markdown(pct_desc)
     plot_or_not(pct_disr_chart, daily_disruption)
-    # st.plotly_chart(pct_disr_chart)
 
     st.subheader("Duration of disruptions", divider="rainbow")
     st.markdown(h_desc)
     plot_or_not(h_disr_chart, daily_disruption)
-    # st.plotly_chart(h_disr_chart)
 
     st.subheader("Impacted stations", divider="rainbow")
     st.markdown(stations_desc_pct)
     plot_or_not(stations_chart_pct, daily_disr_stations)
-    # st.plotly_chart(stations_chart_pct)
 
     st.markdown(stations_desc)
     plot_or_not(stations_chart, daily_disr_stations)
-    # st.plotly_chart(stations_chart)
 
 
 # %% Disruption calculator page
@@ -1740,15 +1615,8 @@ def disruption_calc():
     st.header("Disruption calculator")
 
     # Printing more info to the user on how to use this page
-    st.markdown(
-        """On this page, you can calculate the **probability that you will
-    be impacted by service disruptions** depending on which station you intend on
-    using as well as on when you intend on travelling."""
-    )
-    st.warning(
-        """Note: Please use the filters in the sidebar to make the
-        calculations more relevant for your trip."""
-    )
+    st.markdown(text["calc_page_desc"])
+    st.warning(text["calc_warning"])
 
     # Getting number of unique days in the data
     n_days_hist = operation_fmt["date_in_last_n_days"].max()
@@ -1820,23 +1688,22 @@ def disruption_calc():
 
     # Printing the results to the user
     st.subheader(f"Chances of disruption at {selected_station}", divider="rainbow")
-    st.markdown(
-        f"""Based on historical data covering the period between **{min_date}
-        and {max_date}**, it can be concluded that:"""
+    calc_res_intro = text["calc_res_intro"]
+    calc_res_intro = calc_res_intro.format(min_date=min_date, max_date=max_date)
+    st.markdown(calc_res_intro)
+
+    calc_results = text["calc_results"]
+    calc_results = calc_results.format(
+        selected_station=selected_station,
+        selected_day=selected_day,
+        selected_hour=selected_hour,
+        disruption_pct_selected=disruption_pct_selected,
+        disruption_name_most=disruption_name_most,
+        disruption_pct_most=disruption_pct_most,
+        disruption_name_least=disruption_name_least,
+        disruption_pct_least=disruption_pct_least,
     )
-    st.markdown(
-        f"""
-    - The chance of disruption at **{selected_station}** on **{selected_day}s** 
-    between **{selected_hour} o'clock** is {disruption_pct_selected}%.
-    - During the same time, the station **most likely** to experience disruption
-    is **{disruption_name_most}** ({disruption_pct_most}%), while the station
-    **least likely** to suffer from disruption is **{disruption_name_least}**
-    ({disruption_pct_least}%).
-    - *Please note* that the numbers below are calculated based on
-    historical data and that it is not guaranteed that historical patterns will
-    be repeated in the future (or on any particular given day).
-    """
-    )
+    st.markdown(calc_results)
 
 
 # %% Info on data sources and method page
@@ -1844,82 +1711,21 @@ def disruption_calc():
 
 def method_info(mapping_messages, system_downtime):
     st.header("Information on data collection & processing")
-    st.markdown(
-        """
-    This page describes how the data that serves as the backbone of this app is
-    collected from the **source** and what kind of **assumptions** are made in the
-    calculations.
-    """
-    )
+    st.markdown(text["meth_page_desc"])
     st.subheader("Sourcing operational data", divider="rainbow")
-    st.markdown(
-        """The Copenhagen metro's [website](https://www.m.dk) provides **real-time
-    information** on their operating status in the form of an **on-screen banner**."""
-    )
-    st.markdown(
-        """
-    - Data on the metro's operational status is sourced from their website
-    **once every 10 minutes**, producing a total of up to 6 records per hour.
-    In theory, the data could be downloaded every minute, giving us an even
-    greater level of detail, however, the decision to limit the fetching to once
-    every 10 minutes was made out of consideration for limiting the impact on
-    the server side.
-    - Data is fetched for each metro line where the relevant **status message**
-    is recorded alongside a **timestamp** showing when the check was made.
-    - Any newly downloaded data is **appended to a table** containing all previous
-    historical records (this table is then further processed by adding custom
-    calculated columns and such).
-    - In some cases, it may not be possible to fetch any new data. Should that be
-    the case, an **"Unknown" status** will be assigned to the respective timestamp.
-    - When the data is aggregated to **calculate % of time** for e.g. normally
-    running service or disruption, we divide the number of entries in each status
-    group by the total number of entries in the selected time period. Any duration-
-    related metrics are therefore **approximations rather than exact numbers**.
-    - While it is only the metro team that has access to the most fine-grained data
-    and therefore able to provide the exact numbers, due to the data in here being
-    sourced at frequent and regular intervals, the **approximation** of the actual
-    picture they provide can be considered to be **very good**.
-    """
-    )
+    st.markdown(text["meth_msg_1"])
+    st.markdown(text["meth_msg_2"])
 
     st.subheader("Interpreting status messages", divider="rainbow")
-    st.markdown(
-        """
-    A separate **mapping table** that allows us to group the "raw" status messages
-    into separate categories (e.g. "Normal service" or "Disruption") and that
-    allows for recording the impact on stations in a standardised manner is
-    **maintained manually**.
-    """
-    )
-    st.markdown(
-        """
-    - Status messages are mapped by the author of this app approximately **once
-    a week**. If there are any unmapped service messages, a **banner** will be displayed in the app, informing the user of the potential impact of the
-    missing mapping (typically, missing mapping will lead to **more "Unknown"
-    entries**, therefore underestimating the % of time where the metro was either
-    running according to schedule or suffering from a disruption).
-    - For the sake of **transparency**, the entire mapping table is printed below:
-    """
-    )
+    st.markdown(text["meth_msg_3"])
+    st.markdown(text["meth_msg_4"])
     st.dataframe(mapping_messages)
 
     st.subheader("Dealing with system downtime", divider="rainbow")
-    st.markdown(
-        """
-    The web scraping tool is not without its faults and as such,
-    it is possible for some days to not have any data collected. This can
-    be due to a variety of reasons, including OS crashes, temporary lack of
-    internet access, power outages, etc. Periods with known system downtime
-    are by default included in the insights but can be filtered out by
-    using the *'Showing data'* slicer:
-    """
-    )
+    st.markdown(text["meth_msg_5"])
     st.image("resources/filter_downtime.PNG")
 
-    st.markdown(
-        """For the sake of transparency, all known periods of system
-    downtime, including the reasons behind them, are shown below:"""
-    )
+    st.markdown(text["meth_msg_6"])
     system_downtime = system_downtime.sort_values("date", ascending=False)
     system_downtime = system_downtime.drop(columns="last_modified")
     st.dataframe(system_downtime)
@@ -1930,38 +1736,7 @@ def method_info(mapping_messages, system_downtime):
 
 def legal_info():
     st.header("Legal disclaimer")
-    st.markdown(
-        """
-    This application is intended for educational purposes only and is designed to 
-    benefit the general public.
-    
-    **By using this application, you acknowledge and agree to the following terms**:
-                
-    1. The app **gives an insight** into the quality of service provided by the
-    Copenhagen metro as measured through the reliability of its operation.
-    2. The intent of the author is to **empower the general public** (which 
-    provides funding for the service) and **decision-makers** (who may take
-    measures to improve the quality of service).
-    3. Due to the nature of the data collection, the numbers provided in this app
-    are **approximations of the true numbers**, the latter only being in the
-    possession of the Copenhagen metro team.
-    4. The data is collected through the use of **web scraping**, where the metro's
-    website is accessed once every 10 minutes so that the status messages can be
-    recorded. By doing this, the author has strived to strike a balance between the 
-    need to have fine-grained data and the duty to use public resources in a 
-    responsible manner by not overwhelming the server.
-    5. The data and insights provided by this application are **not intended for
-    commercial use**.
-    6. While every effort has been made to ensure the accuracy and reliability of
-    the data, the creator of this application **does not guarantee** the accuracy,
-    completeness, or suitability of the data for any particular purpose.
-    7. The creator **shall not be held liable for** any loss, damage,
-    or inconvenience arising as a consequence of any use of or the inability to
-    use any information provided by this application.
-
-    These terms were last revised on 02 April 2024.
-"""
-    )
+    st.markdown(text["legal_disclaimer"])
 
 
 # %% Allowing the user to switch between pages in the app

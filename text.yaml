@@ -1,0 +1,162 @@
+# =============================================
+# LONG STRINGS OF TEXT FOR USE IN STREAMLIT APP
+# =============================================
+
+# This file contains the longer texts that are used in the the Streamlit app. The purpose is to simplify the script and remove all the clutter.
+
+# Author: kirilboyanovbg[at]gmail.com
+# Last meaningful update: 06-12-2024
+
+# ======================================================
+# Warnings related to missing mapping of status messages
+# ======================================================
+warning_mapping_many_dates: "There are {unmapped_msg_n} metro status messages that have not yet been classified in terms of their impact on service status. This means that in the period {unmapped_msg_date_min}-{unmapped_msg_date_max}, the numbers in the 'Unknown' category may be overestimated and the numbers in the 'Normal service' and 'Disrupted service' categories may be underestimated. The share of records impacted by this is lower than {unmappped_rows_pct}% across all historical data."
+
+warning_mapping_one_date: "There are {unmapped_msg_n} metro status messages that have not yet been classified in terms of their impact on service status. This means that on {unmapped_msg_date_max}, the numbers in the 'Unknown' category may be overestimated and the numbers in the 'Normal service' and 'Disrupted service' categories may be underestimated. The share of records impacted by this is lower than {unmappped_rows_pct}% across all historical data."
+
+# ===============================================
+# Warnings related to web scraper system downtime
+# ===============================================
+downtime_msg_hidden: " System downtime affecting {downtime_days} day(s)' worth of data has been hidden from view. Please use the *'Showing data'* slicer to show all data, including periods of system downtime."
+
+downtime_msg_shown: " System downtime has been detected in this period, affecting {downtime_days} day(s)' worth of data. Please use the *'Showing data'* slicer to exclude periods of downtime."
+
+downtime_msg_none: " No periods of system downtime have been detected in this period, meaning that all available data is shown on charts etc."
+
+# ======================================================
+# Warning related to no data available for a given chart
+# ======================================================
+warning_chart_no_data: "Warning: you have filtered the data to subsample which contains no data that can be shown on this chart. Please adjust your selection using the slicers in the sidebar to the left."
+
+# ================================
+# Text shown on the app's homepage
+# ================================
+home_msg_1: "This app presents information on the Copenhagen Metro's **operational status over time**, allowing to measure the impact of the disruptions caused to passengers on different lines, stations and different times of the day/week."
+home_msg_2: "**Please scroll down** to see the latest operational status as well as learn how to make the best use of the app."
+home_msg_3: "The **latest data** on the CPH metro's service status were collected on **{last_update_date} at {last_update_time}** o'clock. A preview of the latest status for each line is shown below:"
+home_msg_4: "This app focuses on keeping track of the Copenhagen Metro's service status and aggregating that data in meaningful ways, allowing you to **find answers to questions such as**:"
+home_msg_5: |
+  - How often has the metro run according to schedule in the past (up to) {n_days} days?
+  - How often has the metro experienced disruptions either due to maintenance or unexpected issues?
+  - What were the main causes behind the disruptions that occurred in the selected time period?
+  - Which days of the week saw the highest number of disruptions and which stations were most impacted by them?
+  - Have there been any improvements/a worsening in the share of time where the metro ran according to schedule in the selected time period?
+home_msg_6: |
+  - **The sidebar**: allows you to navigate between the different pages included in the app as well as to apply different filters on the data, such as choosing how many days of data to include in the calculations that  generate the data shown on the charts.
+  - **The main panel**: contains various charts, tables and text descriptions.
+
+  To **switch between different pages**, please click on the page title:
+home_msg_7: "To **apply a filter to the data**, please click on the filter you wish to apply and select the desired value(s). Please note that the filter that lets you decide how many days of historical data to use in the calculations supports *choosing only one value*. By default, it is set to display the last 30 days:"
+home_msg_8: "All other filters support **choosing multiple values** at the same time. By default, all values are kept:"
+home_msg_9: "**Please note** that if you filter the data too much or remove all pre-made selections, there might not be enough data left to display on the charts and the app may revert to selecting something for you. Should that be the case, a **warning message** will be displayed such as the one below:"
+home_msg_10: "To get rid of the warning, please revise your selection or refresh the web page to start over."
+
+# =================================
+# Text shown on the "Overview" page
+# =================================
+gen_overall_desc: "The chart below shows the overall split between normal service operation, service disruptions and unknown status. As such, it indicates how prevalent service disruptions have been in the selected period relative to normal operation:"
+gen_detailed_desc: "The chart below zooms in on cases where the metro did not operate with a normal service and shows the split between the different kinds of other service messages. As such, it allows to understand whether service was impacted by e.g. planned maintenance, delays or a complete disruption:"
+gen_cal_desc: |
+  The chart below shows the daily service reliability of the Copenhagen metro. The **disruption score** plotted on the chart is calculated in the following way:
+
+  - 🟢 If service has been **running normally** or has been affected by planned maintenance on any given day, then the disruption score will be 0 and the day will be plotted with a **green background** on the chart.
+  - 🟡 If service has been affected by at least one **partial disruption** or delay, then the disruption score will be 1 and the day will be plotted with a **yellow background** on the chart.
+  - 🔴 If service has been affected by at least one **complete disruption** or delay, then the disruption score will be 2 and the day will be plotted with a **red background** on the chart.
+  - ⚪ If the web scraper tool has not been running due to unexpected system downtime and no data is recorded, then the disruption score will be -1 and the day will be plotted with a **grey background** on the chart.
+gen_page_desc: "This page shows information on the **overall status of the metro between {selected_period}**, including the share of the time where service was running normally or with disruptions."
+
+
+# ===========================================
+# Text shown on the "Disruption reasons" page
+# ===========================================
+rsn_status_desc: "The chart below presents the split between different kinds of service disruptions, exclusive of normally running service and unknown status. As such, it allows to understand whether service disruptions manifested as e.g. planned maintenance, delays or a complete service stop:"
+rsn_reasons_desc: 'The chart below shows the different reasons given by the CPH metro team. As such, it gives an insight into whether service disruption is mostly due to e.g. technical issues or something else. Please note that a reason is not reported for all disruptions, which can inflate the relative importance of the "Unspecified" factor:'
+rsn_reasons_det_desc: "The chart below presents all specified reasons behind the various service disruption, exluding maintenance. As such, it allows us to understand which areas the CPH metro should improve in to minimize the occurrence of future disruptions:"
+rsn_page_desc: "This page contains insights on the **kinds of service disruptions between {selected_period}**, including the reasons behind those disruptions and some the CPH metro team's major impediments to running a normal service."
+
+# ==========================================
+# Text shown on the "Disruption impact" page
+# ==========================================
+chance_dist_disclaimer: "**Please note** that the numbers from the two charts above may resemble each other but may not be entirely the same. This is due to the fact that the calculations behind them use different bases of comparison."
+rush_disclaimer: "Please note that the classification used is a custom implementation. You can find charts using the Metro's official definition of rush hour further down this page."
+stations_disclaimer: "**Please note** that as the names of impacted stations are not always explicitly mentioned in the service messages, the actual counts may be higher than those presented on the chart."
+desc_mntn_chance_day: "The chart below shows the **chance that planned maintenance** events occur on any given day of the week. In other words, it answers questions such as *How likely is it that maintenance work will be carried out on a Monday?*:"
+desc_mntn_dist_day: "The chart below shows the **number of planned maintenance** events split by weekday. It allows us to answer questions such as *How many of all maintenance events took place on Monday, relative to other days of the week?*:"
+desc_dsrpt_chance_day: "The chart below shows the **chance that unplanned disruptions** occur on any given day of the week. In other words, it answers questions such as *How likely is it that a service disruption will take place on a Monday?*:"
+desc_dsrpt_dist_day: "The chart below shows the **number of unplanned disruptions** split by weekday. It allows us to answer questions such as *How many of all service disruptions took place on Monday, relative to other days of the week?*:"
+desc_dsrpt_chance_period: "The chart below shows the **chance that unplanned interruptions** occur at any given time during the day. In other words, it answers questions such as *How likely is it that a service disruption will take place during early mornings/early afternoons?*:"
+desc_mntn_chance_period: "The chart below shows the **chance that planned maintenance** events occur at any given time during the day. In other words, it answers questions such as *How likely is it that maintenance work will be carried out in late evenings/during the night?*:"
+desc_mntn_dist_period: "The chart below shows the **number of planned maintenance** events split by time of day. It allows us to answer questions such as *How many of all maintenance events took place during late evenings, relative to other times of the day?*:"
+desc_dsrpt_dist_period: "The chart below shows the **number of unplanned disruptions** split by time of day. It allows us to answer questions such as *How many of all service disruptions took place during late evenings, relative to other times of the day?*:"
+desc_dsrpt_chance_rush: "The chart below shows the **chance that unplanned interruptions** occur during what the Metro team officially defines as rush hours. In other words, it answers questions such as *How likely is it that a service disruption will take place during the official morning/afternoon rush hours?*:"
+desc_mntn_chance_rush: "The chart below shows the **chance that planned maintenance** events occur during what the Metro team officially defines as rush hours. In other words, it answers questions such as *How likely is it that maintenance work will be carried out during the official morning/afternoon rush hours?*:"
+desc_mntn_dist_rush: "The chart below shows the **number of planned maintenance** events split by the Metro team's official definition of rush hour. It allows us to answer questions such as *How many of all maintenance events took place during morning/afternoon rush hours, relative to other times of the day?*:"
+desc_dsrpt_dist_rush: "The chart below shows the **number of unplanned disruptions** split by the Metro team's official definition of rush hour. It allows us to answer questions such as *How many of all service disruptions took place during morning/afternoon rush hours, relative to other times of the day?*:"
+desc_most_impacted: "The chart below lists the top 10 metro stations **most frequently impacted by service disruptions**. The number shown is the total number of records in the data where a disruption at the station was recorded:"
+desc_less_impacted: "The chart below lists the 10 metro stations **least often impacted by service disruptions**. The number shown is the total number of records in the data where a disruption at the station was recorded:"
+imp_page_desc: "This page contains insights on the **impact caused by service disruptions between {selected_period}**, including both planned maintenance and unplanned disruptions. You can view the data by weekday, time of day and the names of the most/least affected stations."
+
+# ===========================================
+# Text shown on the "Disruption history" page
+# ===========================================
+hist_n_desc: "The chart below shows the number of unique service messages that can be classified as disruptions. As such, it can be used as an indicator of how many things went wrong on any given day:"
+hist_pct_desc: "The chart below shows the % of the time where a service message classified as disruption was displayed (checks are made once every 10 minutes). As such, it can be used as an indicator of approximately how much of the day was plagued by disruptions relative to normally running service:"
+hist_h_desc: "The chart below shows the average duration of the various service disruptions measured in hours. As such, it can be used as an indicator of whether things were broken for a relatively short time or not:"
+hist_stations_desc_pct: "The chart below shows the average % of stations which were impacted by disruptions in the given period. As such, it can be used to evaluate the magnitude of the disruptions, however, it is important to note that impacted stations are not always mentioned in the service messages, so the share as presented below will probably be underestimated:"
+hist_stations_desc: "The chart below shows essentially the *same information* but rather than looking at the average percentage of impacted stations, we look at the actual number:"
+hist_page_desc: "This page shows a full daily history of **service disruptions between {selected_period}**, including the share of the time where service was running normally, the number and duration of all disruptions as well as how many stations were impacted by the disruptions."
+
+# ==============================================
+# Text shown on the "Disruption calculator" page
+# ==============================================
+calc_page_desc: "On this page, you can calculate the **probability that you will be impacted by service disruptions** depending on which station you intend on using as well as on when you intend on travelling."
+calc_warning: "Note: Please use the filters in the sidebar to make the calculations more relevant for your trip."
+calc_res_intro: "Based on historical data covering the period between **{min_date} and {max_date}**, it can be concluded that:"
+calc_results: |
+  - The chance of disruption at **{selected_station}** on **{selected_day}s**  between **{selected_hour} o'clock** is {disruption_pct_selected}%.
+  - During the same time, the station **most likely** to experience disruption is **{disruption_name_most}** ({disruption_pct_most}%), while the station **least likely** to suffer from disruption is **{disruption_name_least}** ({disruption_pct_least}%).
+  - *Please note* that the numbers below are calculated based on historical data and that it is not guaranteed that historical patterns will be repeated in the future (or on any particular given day).
+
+# ====================================
+# Text shown on the "Method info" page
+# ====================================
+meth_page_desc: "This page describes how the data that serves as the backbone of this app is collected from the **source** and what kind of **assumptions** are made in the calculations."
+meth_msg_1: "The Copenhagen metro's [website](https://www.m.dk) provides **real-time information** on their operating status in the form of an **on-screen banner**."
+meth_msg_2: |
+  - Data on the metro's operational status is sourced from their website **once every 10 minutes**, producing a total of up to 6 records per hour. In theory, the data could be downloaded every minute, giving us an even greater level of detail, however, the decision to limit the fetching to once every 10 minutes was made out of consideration for limiting the impact on the server side.
+  - Data is fetched for each metro line where the relevant **status message** is recorded alongside a **timestamp** showing when the check was made.
+  - Any newly downloaded data is **appended to a table** containing all previous historical records (this table is then further processed by adding custom calculated columns and such).
+  - In some cases, it may not be possible to fetch any new data. Should that be the case, an **"Unknown" status** will be assigned to the respective timestamp.
+  - When the data is aggregated to **calculate % of time** for e.g. normally
+  running service or disruption, we divide the number of entries in each status group by the total number of entries in the selected time period. Any duration-related metrics are therefore **approximations rather than exact numbers**.
+  - While it is only the metro team that has access to the most fine-grained data and therefore able to provide the exact numbers, due to the data in here being sourced at frequent and regular intervals, the **approximation** of the actual picture they provide can be considered to be **very good**.
+meth_msg_3: 'A separate **mapping table** that allows us to group the "raw" status messages into separate categories (e.g. "Normal service" or "Disruption") and that allows for recording the impact on stations in a standardised manner is **maintained manually**.'
+meth_msg_4: |
+  - Status messages are mapped by the author of this app **once a week** as a minimum, sometimes more often. If there are any unmapped service messages, a **banner** will be displayed in the app, informing the user of the potential impact of the missing mapping (typically, missing mapping will lead to **more "Unknown" entries**, therefore underestimating the % of time where the metro was either running according to schedule or suffering from a disruption).
+  - For the sake of **transparency**, the entire mapping table is printed below:
+meth_msg_5: "The web scraping tool is not without its faults and as such, it is possible for some days to not have any data collected. This can be due to a variety of reasons, including OS crashes, temporary lack of internet access, power outages, etc. Periods with known system downtime are by default included in the insights but can be filtered out by using the *'Showing data'* slicer:"
+meth_msg_6: "For the sake of transparency, all known periods of system downtime, including the reasons behind them, are shown below:"
+
+# =========================================
+# Text shown on the "Legal disclaimer" page
+# =========================================
+legal_disclaimer: |
+  This application is intended for educational purposes only and is designed to benefit the general public.
+
+  **By using this application, you acknowledge and agree to the following terms**:
+
+  1. The app **gives an insight** into the quality of service provided by the Copenhagen metro as measured through the reliability of its operation.
+  2. The intent of the author is to **empower the general public** (which 
+  provides funding for the service) and **decision-makers** (who may take
+  measures to improve the quality of service).
+  3. Due to the nature of the data collection, the numbers provided in this app are **approximations of the true numbers**, the latter only being in the possession of the Copenhagen metro team.
+  4. The data is collected through the use of **web scraping**, where the metro's website is accessed once every 10 minutes so that the status messages can be recorded. By doing this, the author has strived to strike a balance between the need to have fine-grained data and the duty to use public resources in a responsible manner by not overwhelming the server.
+  5. The data and insights provided by this application are **not intended for commercial use**.
+  6. While every effort has been made to ensure the accuracy and reliability of the data, the creator of this application **does not guarantee** the accuracy, completeness, or suitability of the data for any particular purpose.
+  7. The creator **shall not be held liable for** any loss, damage,
+  or inconvenience arising as a consequence of any use of or the inability to use any information provided by this application.
+  8. The user is free to use and modify the source code, which is available on [GitHub](https://github.com/cyrilby/cph-metro-status), with proper attribution according to the terms of the GPL-3.0 license agreement.
+
+  These terms were last revised on 6 December 2024.
+
+  For more information, please [contact me via e-mail](mailto:info@mindgraph.dk).
