@@ -227,6 +227,19 @@ def filter_downtime():
     return end_choice
 
 
+# Setting up a function that adds the MindGraph logo
+def add_logo():
+    """
+    Adds the MindGraph logo to the upper left corner of the page.
+    """
+    st.logo(
+        "https://mindgraph.dk/logo.svg",
+        size="large",
+        link="https://mindgraph.dk",
+        icon_image="https://mindgraph.dk/favicon.svg",
+    )
+
+
 # %% Defining further custom functions for the app
 
 
@@ -346,6 +359,7 @@ def colors_for_calplot(data: pd.DataFrame) -> dict:
 # Informs the user of the app's purpose
 def show_homepage():
     st.header("Welcome to the CPH metro status app!")
+    add_logo()
     st.markdown(text["home_msg_1"])
     st.markdown(text["home_msg_2"])
     st.image(
@@ -399,6 +413,7 @@ def show_homepage():
 
 def general_overview():
     st.header("Overview")
+    add_logo()
 
     # Detecting and confirming slicer selections
     n_days = filter_by_n_days(n_possible_days)
@@ -617,6 +632,7 @@ def general_overview():
 
 def disruption_reasons():
     st.header("Disruption reasons")
+    add_logo()
 
     # Detecting and confirming slicer selections
     n_days = filter_by_n_days(n_possible_days)
@@ -806,6 +822,7 @@ def disruption_reasons():
 
 def disruption_impact():
     st.header("Disruption impact")
+    add_logo()
 
     # Detecting and confirming slicer selections
     n_days = filter_by_n_days(n_possible_days)
@@ -1409,6 +1426,7 @@ def disruption_impact():
 
 def disruption_history():
     st.header("Disruption history")
+    add_logo()
 
     # Detecting and confirming slicer selections
     n_days = filter_by_n_days(n_possible_days)
@@ -1613,6 +1631,7 @@ def disruption_history():
 
 def disruption_calc():
     st.header("Disruption calculator")
+    add_logo()
 
     # Printing more info to the user on how to use this page
     st.markdown(text["calc_page_desc"])
@@ -1711,6 +1730,7 @@ def disruption_calc():
 
 def method_info(mapping_messages, system_downtime):
     st.header("Information on data collection & processing")
+    add_logo()
     st.markdown(text["meth_page_desc"])
     st.subheader("Sourcing operational data", divider="rainbow")
     st.markdown(text["meth_msg_1"])
@@ -1736,6 +1756,7 @@ def method_info(mapping_messages, system_downtime):
 
 def legal_info():
     st.header("Legal disclaimer")
+    add_logo()
     st.markdown(text["legal_disclaimer"])
 
 
