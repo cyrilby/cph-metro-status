@@ -3,7 +3,7 @@
 
 # Copenhagen metro operations monitoring tool
 
-* Author: Kiril ([contact here](mailto:info@mindgraph.dk))
+* Author: Kiril (GitHub@cyrilby)
 * Website: [mindgraph.dk](https://mindgraph.dk)
 * Last meaningful update: 06-12-2024
 
