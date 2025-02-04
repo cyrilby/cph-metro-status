@@ -4,13 +4,15 @@ App visualizing the CPH Metro's operational status
 ==================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 06-12-2024
+Last meaningful update: 04-02-2025
 
-This script contains the source code of the Streamlit app accompanying
-the CPH metro scraper tool. In here, we create a series of data visualizations
-that help us get a better understanding of how often the metro breaks down,
-when and where the impact is felt as well as what the reasons behind the
-breakdowns are (if information on those is available).
+This script contains the source code of the Streamlit
+app accompanying the CPH metro scraper tool. In here,
+we create a series of data visualizations that help us
+get a better understanding of how often the metro breaks
+down, when and where the impact is felt as well as what
+the reasons behind the breakdowns are (if information
+on those is available).
 """
 
 # %% Setting things up
@@ -26,6 +28,10 @@ import yaml
 # Importing long text strings used in the app
 with open("text.yaml", "r", encoding="utf-8") as file:
     text = yaml.safe_load(file)
+
+# Importing links to mapping tables
+with open("mapping_links.yaml", "r", encoding="utf-8") as file:
+    mapping_links = yaml.safe_load(file)
 
 
 # %% Importing data for use in the app
@@ -43,9 +49,10 @@ mapping_stations = pd.read_pickle(
 mapping_messages = pd.read_pickle(
     "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_messages.pkl"
 )
-system_downtime = pd.read_excel(
-    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_tables.xlsx",
-    sheet_name="system_downtime",
+system_downtime = pd.read_csv(
+    mapping_links["system_downtime"],
+    parse_dates=["date", "last_modified"],
+    date_format="%d/%m/%Y",
 )
 
 # Correcting dtypes

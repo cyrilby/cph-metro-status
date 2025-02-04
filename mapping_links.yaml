@@ -1,0 +1,19 @@
+# ===============================================
+# LINKS TO MAPPING TABLES STORED IN GOOGLE SHEETS
+# ===============================================
+
+# This file contains links to the spreadsheet on Google Sheets that
+# contains the various mapping tables used in the project.
+
+# Author: kirilboyanovbg[at]gmail.com
+# Last meaningful update: 04-02-2025
+
+mapping_status: https://docs.google.com/spreadsheets/d/1iu7QcYav9865SLSBXGuZWNKUd0ywCrSC0M2vAink1yM/gviz/tq?tqx=out:csv
+
+mapping_hours: https://docs.google.com/spreadsheets/d/1iu7QcYav9865SLSBXGuZWNKUd0ywCrSC0M2vAink1yM/gviz/tq?tqx=out:csv&gid=1503229265
+
+mapping_rush: https://docs.google.com/spreadsheets/d/1iu7QcYav9865SLSBXGuZWNKUd0ywCrSC0M2vAink1yM/gviz/tq?tqx=out:csv&gid=207153164
+
+mapping_stations: https://docs.google.com/spreadsheets/d/1iu7QcYav9865SLSBXGuZWNKUd0ywCrSC0M2vAink1yM/gviz/tq?tqx=out:csv&gid=1159212281
+
+system_downtime: https://docs.google.com/spreadsheets/d/1iu7QcYav9865SLSBXGuZWNKUd0ywCrSC0M2vAink1yM/gviz/tq?tqx=out:csv&gid=777183316

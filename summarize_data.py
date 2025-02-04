@@ -1,17 +1,19 @@
 """
-=============================================================
-Format & summarize data on the CPH Metro's operational status
-=============================================================
+=========================================================
+Format & summarize data on the metro's operational status
+=========================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 05-11-2024
+Last meaningful update: 04-02-2025
 
-In this script, we import data on the Copenhagen Metro's operational
-status collected at different timestamps, then add some information
-on what the status recorded means, including some corrections that
-help us improve the data quality, e.g. separating impacts for M1 and M2.
-After this, we summarize the data in several different tables that
-can then be used for e.g. visualization or analytical purposes.
+In this script, we import data on the Copenhagen Metro's
+operational status collected at different timestamps,
+then add some information on what the status recorded
+means, including some corrections that help us improve
+the data quality, e.g. separating impacts for M1 and M2.
+After this, we summarize the data in several different
+tables that can then be used for e.g. visualization or
+analytical purposes.
 """
 
 # %% Setting things up
@@ -23,6 +25,7 @@ import datetime as dt
 from datetime import time
 import os
 import sys
+import yaml
 
 # Importing custom functions for working with ADLS storage
 from azure_storage import (
@@ -46,31 +49,28 @@ print(f"Note: files will be saved under '{script_dir}'")
 # Arranging for access to Azure cloud storage
 azure_conn = get_access("credentials/azure_conn.txt")
 
+# Importing links to mapping tables
+with open("mapping_links.yaml", "r", encoding="utf-8") as file:
+    mapping_links = yaml.safe_load(file)
+
 # Importing raw data from Azure
 operation_raw = pd.read_pickle(
     "https://freelanceprojects.blob.core.windows.net/cph-metro-status/operation_raw.pkl"
 )
 
 # Importing mapping tables from Azure
-mapping_status = pd.read_excel(
-    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_tables.xlsx",
-    sheet_name="status",
-)
-mapping_hours = pd.read_excel(
-    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_tables.xlsx",
-    sheet_name="hours",
-)
-mapping_rush = pd.read_excel(
-    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_tables.xlsx",
-    sheet_name="rush_hour",
-)
-mapping_stations = pd.read_excel(
-    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_tables.xlsx",
-    sheet_name="stations",
-)
-system_downtime = pd.read_excel(
-    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_tables.xlsx",
-    sheet_name="system_downtime",
+mapping_status = pd.read_csv(mapping_links["mapping_status"])
+
+mapping_hours = pd.read_csv(mapping_links["mapping_hours"])
+
+mapping_rush = pd.read_csv(mapping_links["mapping_rush"])
+
+mapping_stations = pd.read_csv(mapping_links["mapping_stations"])
+
+system_downtime = pd.read_csv(
+    mapping_links["system_downtime"],
+    parse_dates=["date", "last_modified"],
+    date_format="%d/%m/%Y",
 )
 
 # Default "Normal" status to be used in cases where messages displayed
@@ -304,13 +304,21 @@ operation_fmt["eomonth"] = operation_fmt["date"] + pd.offsets.MonthEnd(0)
 morning_rush_start = mapping_rush[mapping_rush["rush_hour"] == "Morning"]["start"].iloc[
     0
 ]
+morning_rush_start = pd.to_datetime(morning_rush_start).time()
+
 morning_rush_end = mapping_rush[mapping_rush["rush_hour"] == "Morning"]["end"].iloc[0]
+morning_rush_end = pd.to_datetime(morning_rush_end).time()
+
 afternoon_rush_start = mapping_rush[mapping_rush["rush_hour"] == "Afternoon"][
     "start"
 ].iloc[0]
+afternoon_rush_start = pd.to_datetime(afternoon_rush_start).time()
+
 afternoon_rush_end = mapping_rush[mapping_rush["rush_hour"] == "Afternoon"]["end"].iloc[
     0
 ]
+afternoon_rush_end = pd.to_datetime(afternoon_rush_end).time()
+
 conditions = [
     (operation_fmt["time"] >= morning_rush_start)
     & (operation_fmt["time"] < morning_rush_end),
@@ -373,7 +381,7 @@ n_unmapped = len(unmapped_status)
 if n_unmapped:
     print(f"Note: There are {n_unmapped} unmapped status messages in the raw data.")
     print(
-        "Please check the 'unmapped_status_messages.csv' file on Azure and add those messags to the 'mapping_tables.xslx' file in the same blob storage container."
+        "Please check the 'unmapped_status_messages.csv' file on Azure and add those messags to the CPH mapping tables Google Sheet."
     )
     write_blob(
         unmapped_status,
