@@ -96,34 +96,41 @@ def scrape_website(url: str) -> BeautifulSoup:
     then be searched for various HTML tags.
 
     Args:
-        url (str): URL of the website we're trying to srape
+        url (str): URL of the website we're trying to scrape
 
     Returns:
         BeautifulSoup: a BS object that can be searched for HTML tags
     """
-    # Loading the web page using a web browser interface
-    if linux_os:
-        service = Service("/usr/bin/chromedriver")
-        driver = webdriver.Chrome(service=service, options=chrome_options)
-    else:
-        service = Service("chromedriver-win64/chromedriver.exe")
-        driver = webdriver.Chrome(service=service, options=chrome_options)
-    driver.get(url)
+    try:
+        # Loading the web page using a web browser interface
+        if linux_os:
+            service = Service("/usr/bin/chromedriver")
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+        else:
+            service = Service("chromedriver-win64/chromedriver.exe")
+            driver = webdriver.Chrome(service=service, options=chrome_options)
 
-    # Converting the object to BS4 HTML object
-    html = driver.page_source
-    if html:
-        soup = BeautifulSoup(html, "html.parser")
-        print("Request successful - HTML content downloaded.")
-    else:
+        driver.get(url)
+
+        # Converting the object to BS4 HTML object
+        html = driver.page_source
+        if html:
+            soup = BeautifulSoup(html, "html.parser")
+            print("Request successful - HTML content downloaded.")
+        else:
+            soup = None
+            print("Request failed - no new data downloaded.")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
         soup = None
-        print("Request failed - no new data downloaded.")
 
-    # Making sure all instances of the Chrome browser are closed
-    # Note: this is only relevant on Windows machines
-    driver.quit()
-    if not linux_os:
-        subprocess.run("kill_chrome.bat")
+    finally:
+        # Making sure all instances of the Chrome browser are closed
+        if 'driver' in locals():
+            driver.quit()
+        if not linux_os:
+            subprocess.run("kill_chrome.bat", shell=True)
 
     # Returning
     return soup
