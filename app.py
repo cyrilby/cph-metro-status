@@ -4,7 +4,7 @@ App visualizing the CPH Metro's operational status
 ==================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 04-02-2025
+Last meaningful update: 13-03-2025
 
 This script contains the source code of the Streamlit
 app accompanying the CPH metro scraper tool. In here,
@@ -20,6 +20,7 @@ on those is available).
 # Importing relevant packages
 import pandas as pd
 import numpy as np
+import datetime as dt
 import streamlit as st
 import plotly.express as px
 from plotly_calplot import calplot
@@ -57,6 +58,10 @@ system_downtime = pd.read_csv(
 
 # Correcting dtypes
 operation_fmt["date"] = pd.to_datetime(operation_fmt["date"])
+
+# Getting the first & last date in the data (to use for filtering)
+max_date_filter = operation_fmt["date"].max()
+min_date_filter = operation_fmt["date"].min()
 
 # Extracting values from the data to be used in slicers etc.
 unique_dates = operation_fmt["date"].unique().tolist()
@@ -160,15 +165,55 @@ options = st.sidebar.radio(
     ],
 )
 
+# Deprecated on 13-03-2025 as we transition to the new date picker
+# # Setting up sidebar filter for number of days to show
+# def filter_by_n_days(list_of_days):
+#     selected_n_days = st.sidebar.select_slider(
+#         "Number of recent days to show",
+#         list_of_days,
+#         value=30,  # showing last 30 days by default
+#     )
+#     return selected_n_days
 
-# Setting up sidebar filter for number of days to show
-def filter_by_n_days(list_of_days):
-    selected_n_days = st.sidebar.select_slider(
-        "Number of recent days to show",
-        list_of_days,
-        value=30,  # showing last 30 days by default
+
+# Sidebar filter that allows picking an interval between dates
+def filter_by_date_range():
+    # Default date range: Last 30 days
+    default_start = max_date_filter - dt.timedelta(days=30)
+    default_end = max_date_filter
+
+    # Create a date input for start and end date
+    selected_dates = st.sidebar.date_input(
+        "Selected time period",
+        (default_start, default_end),
+        min_value=min_date_filter,
+        max_value=max_date_filter,
+        format="DD/MM/YYYY",
     )
-    return selected_n_days
+
+    # If only 1 date is selected, we treat it as a start date
+    # and set the end date to be 30 days later
+    if len(selected_dates) == 0:
+        start_date = default_start
+        end_date = default_end
+    elif len(selected_dates) == 1:
+        start_date = selected_dates[0]
+        end_date = start_date + dt.timedelta(days=30)
+    else:
+        start_date = selected_dates[0]
+        end_date = selected_dates[1]
+
+    # Convert dates to pandas datetime
+    start_date = pd.Timestamp(start_date)
+    end_date = pd.Timestamp(end_date)
+    selected_start = start_date.strftime("%d %b %Y")
+    selected_end = end_date.strftime("%d %b %Y")
+    selected_period = (
+        f"**Note:** showing data for the period {selected_start} - {selected_end}."
+    )
+    st.sidebar.markdown(selected_period)
+
+    return start_date, end_date
 
 
 # Setting up sidebar filter for day type (workday or weekend)
@@ -423,7 +468,7 @@ def general_overview():
     add_logo()
 
     # Detecting and confirming slicer selections
-    n_days = filter_by_n_days(n_possible_days)
+    min_date, max_date = filter_by_date_range()
     day_types = filter_by_day_type()
     hour_types = filter_by_hour_type()
     selected_lines = filter_by_line()
@@ -431,7 +476,7 @@ def general_overview():
 
     # Filtering and arranging the data
     data_to_display = operation_fmt[
-        operation_fmt["date_in_last_n_days"] <= n_days
+        (operation_fmt["date"] >= min_date) & (operation_fmt["date"] <= max_date)
     ].copy()
     data_to_display = data_to_display[
         data_to_display["day_type"].isin(day_types)
@@ -570,7 +615,7 @@ def general_overview():
     )
     # overall_chart.update_traces(textinfo="percent+label") # adds data labels on chart
     overall_chart.update_layout(
-        title_text=f"CPH metro service status during the last {n_days} days",
+        title_text=f"CPH metro service status between {selected_period}",
         legend_title="",
         # autosize=False,
         # width=500,
@@ -581,7 +626,7 @@ def general_overview():
     # Creating a doughnut chart with the detailed status split
     detailed_chart = px.bar(detailed_split, x="status_pct", y="status_en")
     detailed_chart.update_layout(
-        title_text=f"Detailed service status during the last {n_days} days (excl. normal service)"
+        title_text=f"Detailed service status between {selected_period} (excl. normal service)"
     )
     detailed_chart.update_xaxes(title_text="% of time with non-normal service status")
     detailed_chart.update_yaxes(title_text="Detailed service status")
@@ -599,7 +644,7 @@ def general_overview():
         start_month=cal_start_month,
         end_month=cal_end_month,
         text="interpretation",
-        title=f"Metro reliability during the last {n_days} days",
+        title=f"Metro reliability between {selected_period}",
     )
 
     # Preparing messages describing the charts
@@ -642,7 +687,7 @@ def disruption_reasons():
     add_logo()
 
     # Detecting and confirming slicer selections
-    n_days = filter_by_n_days(n_possible_days)
+    min_date, max_date = filter_by_date_range()
     day_types = filter_by_day_type()
     hour_types = filter_by_hour_type()
     selected_lines = filter_by_line()
@@ -650,7 +695,7 @@ def disruption_reasons():
 
     # Filtering and arranging the data
     data_to_display = operation_fmt[
-        operation_fmt["date_in_last_n_days"] <= n_days
+        (operation_fmt["date"] >= min_date) & (operation_fmt["date"] <= max_date)
     ].copy()
     data_to_display = data_to_display[
         data_to_display["day_type"].isin(day_types)
@@ -832,7 +877,7 @@ def disruption_impact():
     add_logo()
 
     # Detecting and confirming slicer selections
-    n_days = filter_by_n_days(n_possible_days)
+    min_date, max_date = filter_by_date_range()
     day_types = filter_by_day_type()
     hour_types = filter_by_hour_type()
     selected_lines = filter_by_line()
@@ -840,7 +885,7 @@ def disruption_impact():
 
     # Filtering and arranging the operations data
     data_to_display = operation_fmt[
-        operation_fmt["date_in_last_n_days"] <= n_days
+        (operation_fmt["date"] >= min_date) & (operation_fmt["date"] <= max_date)
     ].copy()
     data_to_display = data_to_display[
         data_to_display["day_type"].isin(day_types)
@@ -1436,7 +1481,7 @@ def disruption_history():
     add_logo()
 
     # Detecting and confirming slicer selections
-    n_days = filter_by_n_days(n_possible_days)
+    min_date, max_date = filter_by_date_range()
     day_types = filter_by_day_type()
     hour_types = filter_by_hour_type()
     selected_lines = filter_by_line()
@@ -1444,7 +1489,7 @@ def disruption_history():
 
     # Filtering and arranging the data
     data_to_display = operation_fmt[
-        operation_fmt["date_in_last_n_days"] <= n_days
+        (operation_fmt["date"] >= min_date) & (operation_fmt["date"] <= max_date)
     ].copy()
     data_to_display = data_to_display[
         data_to_display["day_type"].isin(day_types)
