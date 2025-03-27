@@ -4,7 +4,7 @@ Get data on the CPH Metro's operational status
 ==============================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 09-07-2024
+Last meaningful update: 27-03-2025
 
 This script is designed to automatically collect data on the operational
 status of the Copenhagen Metro and record disruptions. In practice, this
@@ -24,12 +24,16 @@ https://developer.chrome.com/docs/chromedriver/downloads
 import pandas as pd
 import numpy as np
 import datetime as dt
+import time
 import os
 import sys
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import requests
 import subprocess
 
@@ -39,7 +43,7 @@ from azure_storage import get_access, write_blob
 # Setting up browser options for use in conjuction with Selenium
 chrome_options = Options()
 chrome_options.use_chromium = True
-chrome_options.add_argument("--headless")  # ensuring GUI is off
+# chrome_options.add_argument("--headless")  # ensuring GUI is off
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
 
@@ -56,7 +60,7 @@ os.chdir(script_dir)
 print(f"Note: files will be saved under '{script_dir}'")
 
 # Specifying the URL of the website
-url = "https://m.dk/"
+url = "https://m.dk/da/drift-og-service/status-og-planlagte-driftsaendringer/"
 
 # Specifying what normal operation looks like when data is scraped and formatted
 normal_status = [
@@ -112,6 +116,19 @@ def scrape_website(url: str) -> BeautifulSoup:
 
         driver.get(url)
 
+        # Wait for the "Accepter alle" button to appear and click it
+        try:
+            accept_button = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.CLASS_NAME, "coi-banner__accept"))
+            )
+            accept_button.click()
+            time.sleep(5)
+            print("Cookie banner accepted. Refreshing page...")
+            driver.refresh()
+            time.sleep(10)
+        except Exception as e:
+            print(f"Cookie banner not found or not clickable: {e}")
+
         # Converting the object to BS4 HTML object
         html = driver.page_source
         if html:
@@ -126,8 +143,8 @@ def scrape_website(url: str) -> BeautifulSoup:
         soup = None
 
     finally:
-        # Making sure all instances of the Chrome browser are closed
-        if 'driver' in locals():
+        # Wait before closing the browser
+        if "driver" in locals():
             driver.quit()
         if not linux_os:
             subprocess.run("kill_chrome.bat", shell=True)
@@ -172,43 +189,42 @@ def scrape_status_from_web() -> pd.DataFrame:
 
     # If data is returned, finding the relevant HTML code
     if html_content:
-        operation_status = html_content.find_all(
-            "div", class_="operation-data__changes"
+        operation_status = html_content.find(
+            "div", class_="flex flex-col gap-xxs mb-xs"
         )
     else:
         operation_status = None
 
     # Extracting info on lines and current operational status
-    if operation_status:
-        current_status_divs = html_content.find_all(
-            "div", class_="operation-data__changes"
-        )
-        current_status = []
-        for div in current_status_divs:
-            current_status.extend(div.find_all("span"))
-        current_status = [status.get_text(strip=True) for status in current_status]
-        current_status = remove_duplicates(current_status, allowed_exceptions)
-    else:
-        current_status = None
+    # =============================
+    # 1) ASSUMING NORMAL OPERATIONS
+    # =============================
+    # Color-to-line mapping
+    color_map = {"#008D41": "M1", "#FFC600": "M2", "#FF0A0A": "M3", "#009CD3": "M4"}
 
-    # If everything is running normally, the list will look exactly as the one below
+    # Extract all <svg> elements
+    svg_elements = operation_status.find_all("svg")
+
+    # Initialize dictionary to hold found lines
+    lines_found = []
+
+    for svg in svg_elements:
+        path = svg.find("path")
+        if path and path.has_attr("fill"):
+            fill_color = path["fill"]
+            if fill_color in color_map:
+                lines_found.append(color_map[fill_color])
+
+    # Get status text (assuming it's in the last <div> with text)
+    status_text = operation_status.get_text(strip=True)
+
+    # Build result dictionary and transform to df
+    current_status = {line: status_text for line in lines_found}
     if current_status:
-        if current_status in normal_status:
-            current_status = pd.DataFrame({"line": metro_lines})
-            current_status["status"] = "Vi kører efter planen"
-            current_status["timestamp"] = timestamp
-        else:
-            current_status = pd.DataFrame({"line": current_status})
-            current_status["is_status"] = ~current_status["line"].isin(metro_lines)
-            current_status["status"] = np.where(
-                current_status["is_status"], current_status["line"], np.nan
-            )
-            current_status["status"] = current_status["status"].bfill()
-            current_status = current_status[
-                current_status["line"].isin(metro_lines)
-            ].copy()
-            current_status = current_status.drop(columns=["is_status"])
-            current_status["timestamp"] = timestamp
+        current_status = pd.DataFrame(
+            current_status.items(), columns=["line", "status"]
+        )
+        current_status["timestamp"] = timestamp
     else:
         current_status = pd.DataFrame()
     return current_status
