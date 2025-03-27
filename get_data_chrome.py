@@ -43,7 +43,7 @@ from azure_storage import get_access, write_blob
 # Setting up browser options for use in conjuction with Selenium
 chrome_options = Options()
 chrome_options.use_chromium = True
-# chrome_options.add_argument("--headless")  # ensuring GUI is off
+chrome_options.add_argument("--headless")  # ensuring GUI is off
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
 
@@ -60,7 +60,7 @@ os.chdir(script_dir)
 print(f"Note: files will be saved under '{script_dir}'")
 
 # Specifying the URL of the website
-url = "https://m.dk/da/drift-og-service/status-og-planlagte-driftsaendringer/"
+url = "https://m.dk/da/"
 
 # Specifying what normal operation looks like when data is scraped and formatted
 normal_status = [
@@ -105,6 +105,7 @@ def scrape_website(url: str) -> BeautifulSoup:
     Returns:
         BeautifulSoup: a BS object that can be searched for HTML tags
     """
+    print("Scraping HTML code from website in progress...")
     try:
         # Loading the web page using a web browser interface
         if linux_os:
