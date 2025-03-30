@@ -4,7 +4,7 @@ Get data on the CPH Metro's operational status
 ==============================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 27-03-2025
+Last meaningful update: 30-03-2025
 
 This script is designed to automatically collect data on the operational
 status of the Copenhagen Metro and record disruptions. In practice, this
@@ -22,7 +22,6 @@ https://developer.chrome.com/docs/chromedriver/downloads
 
 # Importing relevant packages
 import pandas as pd
-import numpy as np
 import datetime as dt
 import time
 import os
@@ -34,7 +33,6 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import requests
 import subprocess
 
 # Importing custom functions for working with ADLS storage
@@ -185,50 +183,64 @@ def scrape_status_from_web() -> pd.DataFrame:
     Returns:
         pd.DataFrame: df with status for each line.
     """
-    # Getting the contents of a website and creating a timestamp
-    html_content = scrape_website(url)
+    try:
+        # Getting the contents of a website and creating a timestamp
+        html_content = scrape_website(url)
 
-    # If data is returned, finding the relevant HTML code
-    if html_content:
-        operation_status = html_content.find(
-            "div", class_="flex flex-col gap-xxs mb-xs"
-        )
-    else:
-        operation_status = None
+        # If data is returned, finding the relevant HTML code
+        if html_content:
+            operation_status = html_content.find(
+                "div", class_="flex flex-col gap-xxs mb-xs"
+            )
+        else:
+            operation_status = None
 
-    # Extracting info on lines and current operational status
-    # =============================
-    # 1) ASSUMING NORMAL OPERATIONS
-    # =============================
-    # Color-to-line mapping
-    color_map = {"#008D41": "M1", "#FFC600": "M2", "#FF0A0A": "M3", "#009CD3": "M4"}
+        # Extract all <svg> elements
+        svg_elements = operation_status.find_all("svg")
 
-    # Extract all <svg> elements
-    svg_elements = operation_status.find_all("svg")
+        # Color-to-line mapping
+        color_map = {"#008D41": "M1", "#FFC600": "M2", "#FF0A0A": "M3", "#009CD3": "M4"}
 
-    # Initialize dictionary to hold found lines
-    lines_found = []
+        # Initialize dictionary to hold found lines
+        lines_found = []
+        for svg in svg_elements:
+            path = svg.find("path")
+            if path and path.has_attr("fill"):
+                fill_color = path["fill"]
+                if fill_color in color_map:
+                    lines_found.append(color_map[fill_color])
 
-    for svg in svg_elements:
-        path = svg.find("path")
-        if path and path.has_attr("fill"):
-            fill_color = path["fill"]
-            if fill_color in color_map:
-                lines_found.append(color_map[fill_color])
+        # Get status text (assuming it's in the last <div> with text)
+        status_text = operation_status.get_text(strip=True)
 
-    # Get status text (assuming it's in the last <div> with text)
-    status_text = operation_status.get_text(strip=True)
+        # Build result dictionary and transform to df
+        current_status = {line: status_text for line in lines_found}
+        if current_status:
+            current_status = pd.DataFrame(
+                current_status.items(), columns=["line", "status"]
+            )
+            current_status["timestamp"] = dt.datetime.now().strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+        else:
+            current_status = pd.DataFrame()
 
-    # Build result dictionary and transform to df
-    current_status = {line: status_text for line in lines_found}
-    if current_status:
-        current_status = pd.DataFrame(
-            current_status.items(), columns=["line", "status"]
-        )
-        current_status["timestamp"] = timestamp
-    else:
-        current_status = pd.DataFrame()
-    return current_status
+        return current_status
+
+    except Exception as e:
+        # Create a timestamp for the log file
+        timestamp = time.strftime("%Y-%m-%d_%H_%M_%S")
+        log_filename = f"logs/failure_{timestamp}.html"
+
+        # Ensure the logs directory exists
+        os.makedirs("logs", exist_ok=True)
+
+        # Save the HTML content to a file
+        with open(log_filename, "w", encoding="utf-8") as f:
+            f.write(str(html_content))
+
+        print(f"An error occurred. HTML content saved to {log_filename}")
+        raise e  # Re-raise the exception after logging
 
 
 # %% Importing previously stored data
