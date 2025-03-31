@@ -152,28 +152,6 @@ def scrape_website(url: str) -> BeautifulSoup:
     return soup
 
 
-# Custom function to remove duplicates from list while preserving the original order
-def remove_duplicates(input_list: list, exceptions: list = []) -> list:
-    """
-    Removes duplicates from list while preserving the original order
-    of the list. Allows certain duplicates supplied to the function as
-    the "exceptions" list.
-
-    Args:
-        input_list (list): input list containing duplicates.
-        exceptions (list): list of elements allowed to be duplicated.
-
-    Returns:
-        list: output list without duplicates, except for elements in the exceptions list.
-    """
-    output_list = []
-    for i in input_list:
-        if i in output_list and i not in exceptions:
-            continue
-        output_list.append(i)
-    return output_list
-
-
 # Custom function to scrape current operational status
 def scrape_status_from_web() -> pd.DataFrame:
     """
