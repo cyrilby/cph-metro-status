@@ -4,7 +4,7 @@ Get data on the CPH Metro's operational status
 ==============================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 30-03-2025
+Last meaningful update: 31-03-2025
 
 This script is designed to automatically collect data on the operational
 status of the Copenhagen Metro and record disruptions. In practice, this
@@ -195,35 +195,29 @@ def scrape_status_from_web() -> pd.DataFrame:
         else:
             operation_status = None
 
-        # Extract all <svg> elements
-        svg_elements = operation_status.find_all("svg")
+        # Metro lines are always listed in an ascending order
+        lines = ["M1", "M2", "M3", "M4"]
 
-        # Color-to-line mapping
-        color_map = {"#008D41": "M1", "#FFC600": "M2", "#FF0A0A": "M3", "#009CD3": "M4"}
+        # Status messages are grouped for M1&M2 or M3&M4
+        message_divs = operation_status.find_all(
+            "div", class_="flex items-center text-white"
+        )
+        status_texts = [div.get_text(strip=True) for div in message_divs]
 
-        # Initialize dictionary to hold found lines
-        lines_found = []
-        for svg in svg_elements:
-            path = svg.find("path")
-            if path and path.has_attr("fill"):
-                fill_color = path["fill"]
-                if fill_color in color_map:
-                    lines_found.append(color_map[fill_color])
-
-        # Get status text (assuming it's in the last <div> with text)
-        status_text = operation_status.get_text(strip=True)
-
-        # Build result dictionary and transform to df
-        current_status = {line: status_text for line in lines_found}
-        if current_status:
-            current_status = pd.DataFrame(
-                current_status.items(), columns=["line", "status"]
-            )
-            current_status["timestamp"] = dt.datetime.now().strftime(
-                "%Y-%m-%d %H:%M:%S"
-            )
+        # If only 1 status is available, it applies to all lines;
+        # if 2 statuses are available, they apply to the groups
+        # of metro lines; if something else is returned, it is
+        # likely an error in the code that needs to be fixed
+        if len(status_texts) == 1:
+            status = 4 * status_texts
+        elif len(status_texts) == 2:
+            status = 2 * [status_texts[0]] + 2 * [status_texts[1]]
         else:
-            current_status = pd.DataFrame()
+            status = 4 * ["Unknown"]
+
+        # Transform the results in a df and add timestamp
+        current_status = pd.DataFrame({"line": lines, "status": status})
+        current_status["timestamp"] = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         return current_status
 
