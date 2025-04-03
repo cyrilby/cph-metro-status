@@ -4,7 +4,7 @@ Format & summarize data on the metro's operational status
 =========================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 04-02-2025
+Last meaningful update: 03-04-2025
 
 In this script, we import data on the Copenhagen Metro's
 operational status collected at different timestamps,
@@ -220,6 +220,41 @@ def validate_stations(stations_str: str, line: str, sep: str = ", ") -> str:
     # Converting back to a string and returning
     affected_str = ", ".join(affected_list)
     return affected_str
+
+
+def check_memory_usage(df: pd.DataFrame) -> None:
+    """
+    Checks memory usage of a pandas dataframe.
+    Prints the usage in MB for the user.
+
+    Args:
+        df (pd.DataFrame): df to check
+    """
+    memory_bytes = df.memory_usage(deep=True).sum()
+    memory_mb = memory_bytes / 1024**2
+    print(f"Data usage: {memory_mb} MB.")
+
+
+def optimize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Optimizes pandas dataframe for storage and speed by
+    downcasting numerical variables and converting
+    strings to categorical variables.
+
+    Args:
+        df (pd.DataFrame): input df
+
+    Returns:
+        pd.DataFrame: output df, optimized
+    """
+    for col in df.select_dtypes(include=["float"]):
+        df[col] = pd.to_numeric(df[col], downcast="float")
+    for col in df.select_dtypes(include=["int"]):
+        df[col] = pd.to_numeric(df[col], downcast="integer")
+    for col in df.select_dtypes(include=["object"]):
+        if df[col].nunique() / df[col].count() < 0.5:
+            df[col] = df[col].astype("category")
+    return df
 
 
 # %% Ensuring we have rows for all datetimes covered by the data
@@ -770,9 +805,19 @@ print("Preparing a table with impacted stations successfully completed.")
 
 # %% Data preview and export
 
-# Temp data preview
-operation_fmt.head(5)
-station_impact.head(5)
+# Optimizing data types to improve app speed in streamlit
+# Note: use the check_memory_usage() to compare before & after
+# Reductions in memory usage are massive: 89% less memory for
+# the "operation_fmt" df and 97% for the "station_impact" df
+# check_memory_usage(operation_fmt)
+operation_fmt = optimize_dataframe(operation_fmt)
+station_impact = optimize_dataframe(station_impact)
+mapping_stations = optimize_dataframe(mapping_stations)
+mapping_status = optimize_dataframe(mapping_status)
+
+# # Temp data preview
+# operation_fmt.head(5)
+# station_impact.head(5)
 
 # Exporting formatted data locally
 # operation_fmt.to_parquet("data/operation_fmt.parquet")
