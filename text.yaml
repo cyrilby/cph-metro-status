@@ -47,7 +47,7 @@ home_msg_6: |
   - **The main panel**: contains various charts, tables and text descriptions.
 
   To **switch between different pages**, please click on the page title:
-home_msg_7: "To **apply a filter to the data**, please click on the filter you wish to apply and select the desired value(s). Please note that the filter that lets you decide how many days of historical data to use in the calculations supports *choosing only one value*. By default, it is set to display the last 30 days:"
+home_msg_7: "To **apply a filter to the data**, please click on the filter you wish to apply and select the desired value(s). Please note that the filter that lets you decide the **timespan** of historical data to show requires selecting both a *start date* and an *end date*. By default, it is set to display the last 30 days:"
 home_msg_8: "All other filters support **choosing multiple values** at the same time. By default, all values are kept:"
 home_msg_9: "**Please note** that if you filter the data too much or remove all pre-made selections, there might not be enough data left to display on the charts and the app may revert to selecting something for you. Should that be the case, a **warning message** will be displayed such as the one below:"
 home_msg_10: "To get rid of the warning, please revise your selection or refresh the web page to start over."
@@ -60,10 +60,14 @@ gen_detailed_desc: "The chart below zooms in on cases where the metro did not op
 gen_cal_desc: |
   The chart below shows the daily service reliability of the Copenhagen metro. The **disruption score** plotted on the chart is calculated in the following way:
 
-  - 🟢 If service has been **running normally** or has been affected by planned maintenance on any given day, then the disruption score will be 0 and the day will be plotted with a **green background** on the chart.
-  - 🟡 If service has been affected by at least one **partial disruption** or delay, then the disruption score will be 1 and the day will be plotted with a **yellow background** on the chart.
-  - 🔴 If service has been affected by at least one **complete disruption** or delay, then the disruption score will be 2 and the day will be plotted with a **red background** on the chart.
-  - ⚪ If the web scraper tool has not been running due to unexpected system downtime and no data is recorded, then the disruption score will be -1 and the day will be plotted with a **grey background** on the chart.
+  <span style="color:#28b09c">⬤</span> If service has been **running normally** or has been affected by planned maintenance on any given day, then the disruption score will be 0 and the day will be plotted with a **green background** on the chart.
+
+  <span style="color:#fed16a">⬤</span> If service has been affected by at least one **partial disruption** or delay, then the disruption score will be 1 and the day will be plotted with a **yellow background** on the chart.
+
+  <span style="color:#fe2b2a">⬤</span> If service has been affected by at least one **complete disruption** or delay, then the disruption score will be 2 and the day will be plotted with a **red background** on the chart.
+
+  <span style="color:#ededed">⬤</span> If the web scraper tool has not been running due to unexpected system downtime and no data is recorded, then the disruption score will be -1 and the day will be plotted with a **grey background** on the chart.
+
 gen_page_desc: "This page shows information on the **overall status of the metro between {selected_period}**, including the share of the time where service was running normally or with disruptions."
 
 

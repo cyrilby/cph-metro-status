@@ -4,7 +4,7 @@ App visualizing the CPH Metro's operational status
 ==================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 13-03-2025
+Last meaningful update: 16-04-2025
 
 This script contains the source code of the Streamlit
 app accompanying the CPH metro scraper tool. In here,
@@ -23,6 +23,7 @@ import numpy as np
 import datetime as dt
 import streamlit as st
 import plotly.express as px
+import plotly.io as pio
 from plotly_calplot import calplot
 import yaml
 
@@ -33,6 +34,55 @@ with open("text.yaml", "r", encoding="utf-8") as file:
 # Importing links to mapping tables
 with open("mapping_links.yaml", "r", encoding="utf-8") as file:
     mapping_links = yaml.safe_load(file)
+
+
+# %% HTML and color customization
+
+# Creating a custom color palette with the MG colors
+# Using the "Classy" palette from: https://mycolor.space/?hex=%231EA2B5&sub=1
+my_custom_palette = ["#1ea2b5", "#324b4f", "#95b0b5", "#9f8ac3", "#6b588d"]
+my_template = pio.templates["plotly_white"].layout.template
+my_template.layout.colorway = my_custom_palette
+pio.templates["my_custom_template"] = my_template
+pio.templates.default = "my_custom_template"
+
+
+# Replacing the line on top of the app with a custom color
+# Replace the gradient with a solid color (e.g., blue)
+def customize_colors():
+    """
+    Allows for customization of streamlit top bar and the color
+    of the links, which are both not directly editable via Python.
+    Instead, this function uses HTML-based CSS injection to make
+    the required changes.
+    """
+
+    # Change the color of the top bar
+    st.markdown(
+        """
+        <style>
+            div[data-testid="stDecoration"] {
+                background: #1ea2b5;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Change the color of links (a href)
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stMarkdownContainer"] a {
+            color: #1ea2b5 !important;
+        }
+        div[data-testid="stMarkdownContainer"] a:hover {
+            color: #1ea2b5 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 # %% Importing data for use in the app
@@ -410,6 +460,7 @@ def colors_for_calplot(data: pd.DataFrame) -> dict:
 
 # Informs the user of the app's purpose
 def show_homepage():
+    customize_colors()
     st.header("Welcome to the CPH metro status app!")
     add_logo()
     st.markdown(text["home_msg_1"])
@@ -419,7 +470,7 @@ def show_homepage():
     )  # image can be disabled in development phase
 
     # Displaying the latest service message from the metro's website
-    st.subheader("Latest service status data", divider="rainbow")
+    st.subheader("Latest service status data", divider="grey")
     if mapping_warning:
         st.warning(mapping_warning)
 
@@ -431,14 +482,14 @@ def show_homepage():
     st.dataframe(most_recent)
 
     # Displaying more info on how the app can help the user
-    st.subheader("How this app can help you", divider="rainbow")
+    st.subheader("How this app can help you", divider="grey")
     st.markdown(text["home_msg_4"])
     msg_text = text["home_msg_5"]
     msg_text = msg_text.format(n_days=n_days)
     st.markdown(msg_text)
 
     # Displaying more info on how to use the app
-    st.subheader("How to use this app", divider="rainbow")
+    st.subheader("How to use this app", divider="grey")
     st.markdown("This app consists of the following two panes:")
     st.markdown(text["home_msg_6"])
     # st.markdown(
@@ -448,9 +499,9 @@ def show_homepage():
     st.markdown("You will then be redirected to the desired page.")
 
     # Displaying more info on how the user can filter the data
-    st.subheader("How to apply filters to the data", divider="rainbow")
+    st.subheader("How to apply filters to the data", divider="grey")
     st.markdown(text["home_msg_7"])
-    st.image("resources/filter_recent_days.PNG")
+    st.image("resources/filter_date.PNG")
     st.markdown(text["home_msg_8"])
     st.image("resources/filter_lines.PNG")
     st.markdown(text["home_msg_9"])
@@ -464,6 +515,7 @@ def show_homepage():
 
 
 def general_overview():
+    customize_colors()
     st.header("Overview")
     add_logo()
 
@@ -665,17 +717,17 @@ def general_overview():
     metric2.metric("Disrupted service, pct of time", str(pct_disruption) + "%")
     metric3.metric("Unknown status, pct of time", str(pct_unknown) + "%")
 
-    st.subheader("Overall service status", divider="rainbow")
+    st.subheader("Overall service status", divider="grey")
     st.markdown(overall_desc)
     plot_or_not(overall_chart, overall_split)
 
-    st.subheader("Detailed service status", divider="rainbow")
+    st.subheader("Detailed service status", divider="grey")
     st.markdown(detailed_desc)
     plot_or_not(detailed_chart, detailed_split)
 
     # Plotting a calendar-based overview
-    st.subheader("Daily service reliability", divider="rainbow")
-    st.markdown(cal_desc)
+    st.subheader("Daily service reliability", divider="grey")
+    st.markdown(cal_desc, unsafe_allow_html=True)
     plot_or_not(cal_fig, cal_data)
 
 
@@ -683,6 +735,7 @@ def general_overview():
 
 
 def disruption_reasons():
+    customize_colors()
     st.header("Disruption reasons")
     add_logo()
 
@@ -857,11 +910,11 @@ def disruption_reasons():
     metric2.metric("Running with delays", str(pct_delay) + "%")
     metric3.metric("Complete service disruptions", str(pct_stop) + "%")
 
-    st.subheader("Kinds of disruptions", divider="rainbow")
+    st.subheader("Kinds of disruptions", divider="grey")
     st.markdown(status_desc)
     plot_or_not(status_chart, detailed_status)
 
-    st.subheader("Reasons behind service disruptions", divider="rainbow")
+    st.subheader("Reasons behind service disruptions", divider="grey")
     st.markdown(reasons_desc)
     plot_or_not(reasons_chart, reasons_split)
 
@@ -873,6 +926,7 @@ def disruption_reasons():
 
 
 def disruption_impact():
+    customize_colors()
     st.header("Disruption impact")
     add_logo()
 
@@ -1414,21 +1468,21 @@ def disruption_impact():
     metric2.metric("Avg disruption % on that day", str(most_imp_day_val) + "%")
     metric3.metric("Most impacted station", str(most_imp_station_name))
 
-    st.subheader("Daily impact of unplanned disruptions", divider="rainbow")
+    st.subheader("Daily impact of unplanned disruptions", divider="grey")
     st.markdown(desc_dsrpt_chance_day)
     plot_or_not(chart_by_day_chance_dsrpt, by_day_chance_dsrpt)
     st.markdown(desc_dsrpt_dist_day)
     plot_or_not(chart_by_day_dist_dsrpt, by_day_dist_dsrpt)
     st.markdown(chance_dist_disclaimer)
 
-    st.subheader("Daily impact of planned maintenance", divider="rainbow")
+    st.subheader("Daily impact of planned maintenance", divider="grey")
     st.markdown(desc_mntn_chance_day)
     plot_or_not(chart_by_day_chance_mntn, by_day_chance_mntn)
     st.markdown(desc_mntn_dist_day)
     plot_or_not(chart_by_day_dist_mntn, by_day_dist_mntn)
     st.markdown(chance_dist_disclaimer)
 
-    st.subheader("Hourly impact of unplanned disruptions", divider="rainbow")
+    st.subheader("Hourly impact of unplanned disruptions", divider="grey")
     st.markdown(desc_dsrpt_chance_period)
     st.warning(rush_disclaimer)
     plot_or_not(chart_by_period_chance_dsrpt, by_period_chance_dsrpt)
@@ -1436,7 +1490,7 @@ def disruption_impact():
     plot_or_not(chart_by_period_dist_dsprt, by_period_dist_dsrpt)
     st.markdown(chance_dist_disclaimer)
 
-    st.subheader("Hourly impact of planned maintenance", divider="rainbow")
+    st.subheader("Hourly impact of planned maintenance", divider="grey")
     st.markdown(desc_mntn_chance_period)
     st.warning(rush_disclaimer)
     plot_or_not(chart_by_period_chance_mntn, by_period_chance_mntn)
@@ -1445,7 +1499,7 @@ def disruption_impact():
     st.markdown(chance_dist_disclaimer)
 
     st.subheader(
-        "Impact of unplanned disruptions during official rush hour", divider="rainbow"
+        "Impact of unplanned disruptions during official rush hour", divider="grey"
     )
     st.markdown(desc_dsrpt_chance_rush)
     plot_or_not(chart_by_rush_chance_dsrpt, by_rush_chance_dsrpt)
@@ -1454,7 +1508,7 @@ def disruption_impact():
     st.markdown(chance_dist_disclaimer)
 
     st.subheader(
-        "Impact of planned maintenance during official rush hour", divider="rainbow"
+        "Impact of planned maintenance during official rush hour", divider="grey"
     )
     st.markdown(desc_mntn_chance_rush)
     plot_or_not(chart_by_rush_chance_mntn, by_rush_chance_mntn)
@@ -1462,12 +1516,12 @@ def disruption_impact():
     plot_or_not(chart_by_rush_dist_mntn, by_rush_dist_mntn)
     st.markdown(chance_dist_disclaimer)
 
-    st.subheader("Most impacted stations", divider="rainbow")
+    st.subheader("Most impacted stations", divider="grey")
     st.markdown(desc_most_impacted)
     plot_or_not(chart_stations_most, most_impacted)
     st.markdown(stations_disclaimer)
 
-    st.subheader("Least impacted stations", divider="rainbow")
+    st.subheader("Least impacted stations", divider="grey")
     st.markdown(desc_less_impacted)
     plot_or_not(chart_stations_least, least_impacted)
     st.markdown(stations_disclaimer)
@@ -1477,6 +1531,7 @@ def disruption_impact():
 
 
 def disruption_history():
+    customize_colors()
     st.header("Disruption history")
     add_logo()
 
@@ -1658,19 +1713,19 @@ def disruption_history():
     metric2.metric("Average disruptions per day", str(avg_per_day))
     metric3.metric("Average duration", str(avg_duration) + "h")
 
-    st.subheader("Number of disruptions", divider="rainbow")
+    st.subheader("Number of disruptions", divider="grey")
     st.markdown(n_desc)
     plot_or_not(n_disr_chart, daily_disruption)
 
-    st.subheader("Disruptions as % of time", divider="rainbow")
+    st.subheader("Disruptions as % of time", divider="grey")
     st.markdown(pct_desc)
     plot_or_not(pct_disr_chart, daily_disruption)
 
-    st.subheader("Duration of disruptions", divider="rainbow")
+    st.subheader("Duration of disruptions", divider="grey")
     st.markdown(h_desc)
     plot_or_not(h_disr_chart, daily_disruption)
 
-    st.subheader("Impacted stations", divider="rainbow")
+    st.subheader("Impacted stations", divider="grey")
     st.markdown(stations_desc_pct)
     plot_or_not(stations_chart_pct, daily_disr_stations)
 
@@ -1682,6 +1737,7 @@ def disruption_history():
 
 
 def disruption_calc():
+    customize_colors()
     st.header("Disruption calculator")
     add_logo()
 
@@ -1758,7 +1814,7 @@ def disruption_calc():
     ]["station"].iloc[0]
 
     # Printing the results to the user
-    st.subheader(f"Chances of disruption at {selected_station}", divider="rainbow")
+    st.subheader(f"Chances of disruption at {selected_station}", divider="grey")
     calc_res_intro = text["calc_res_intro"]
     calc_res_intro = calc_res_intro.format(min_date=min_date, max_date=max_date)
     st.markdown(calc_res_intro)
@@ -1781,19 +1837,20 @@ def disruption_calc():
 
 
 def method_info(mapping_messages, system_downtime):
+    customize_colors()
     st.header("Information on data collection & processing")
     add_logo()
     st.markdown(text["meth_page_desc"])
-    st.subheader("Sourcing operational data", divider="rainbow")
+    st.subheader("Sourcing operational data", divider="grey")
     st.markdown(text["meth_msg_1"])
     st.markdown(text["meth_msg_2"])
 
-    st.subheader("Interpreting status messages", divider="rainbow")
+    st.subheader("Interpreting status messages", divider="grey")
     st.markdown(text["meth_msg_3"])
     st.markdown(text["meth_msg_4"])
     st.dataframe(mapping_messages)
 
-    st.subheader("Dealing with system downtime", divider="rainbow")
+    st.subheader("Dealing with system downtime", divider="grey")
     st.markdown(text["meth_msg_5"])
     st.image("resources/filter_downtime.PNG")
 
@@ -1807,6 +1864,7 @@ def method_info(mapping_messages, system_downtime):
 
 
 def legal_info():
+    customize_colors()
     st.header("Legal disclaimer")
     add_logo()
     st.markdown(text["legal_disclaimer"])
