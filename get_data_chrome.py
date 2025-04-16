@@ -4,7 +4,7 @@ Get data on the CPH Metro's operational status
 ==============================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 31-03-2025
+Last meaningful update: 16-04-2025
 
 This script is designed to automatically collect data on the operational
 status of the Copenhagen Metro and record disruptions. In practice, this
@@ -58,7 +58,7 @@ os.chdir(script_dir)
 print(f"Note: files will be saved under '{script_dir}'")
 
 # Specifying the URL of the website
-url = "https://m.dk/da/"
+url = "https://m.dk/da/drift-og-service/status-og-planlagte-driftsaendringer/"
 
 # Specifying what normal operation looks like when data is scraped and formatted
 normal_status = [
@@ -167,9 +167,7 @@ def scrape_status_from_web() -> pd.DataFrame:
 
         # If data is returned, finding the relevant HTML code
         if html_content:
-            operation_status = html_content.find(
-                "div", class_="flex flex-col gap-xxs mb-xs"
-            )
+            operation_status = html_content.find("div", class_="pr-s")
         else:
             operation_status = None
 
