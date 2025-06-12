@@ -251,6 +251,9 @@ print(f"Current operational status as of '{formatted_timestamp}':\n")
 print(current_status.head(4))
 print("\n")
 
+
+# %% Combining newly scraped data with previously scraped data
+
 # Appending the data to any previously recorded historical data and formatting
 operation_raw_updated = pd.concat(
     [operation_raw, current_status.astype(operation_raw.dtypes)]
