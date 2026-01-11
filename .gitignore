@@ -3,3 +3,5 @@ credentials/azure_conn.txt
 /chromedriver-win64
 /chromedriver-linux64
 /logs
+.env
+/.venv
