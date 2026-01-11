@@ -7,4 +7,5 @@ plotly_calplot==0.1.20
 openpyxl==3.1.2
 PyYAML==6.0.2
 python-dotenv==1.2.1
+fsspec==2026.1.0 # for importing files from Bunny.net CDN
 bunny_ds @ git+https://github.com/cyrilby/bunny-ds.git

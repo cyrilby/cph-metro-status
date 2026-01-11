@@ -4,7 +4,7 @@ App visualizing the CPH Metro's operational status
 ==================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 16-04-2025
+Last meaningful update: 11-01-2026
 
 This script contains the source code of the Streamlit
 app accompanying the CPH metro scraper tool. In here,
@@ -89,16 +89,16 @@ def customize_colors():
 
 # Importing pre-processed data & relevant mapping tables from Azure
 operation_fmt = pd.read_parquet(
-    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/operation_fmt.parquet"
+    "https://cph-metro-status.b-cdn.net/operation_fmt.parquet"
 )
 station_impact = pd.read_parquet(
-    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/station_impact.parquet"
+    "https://cph-metro-status.b-cdn.net/station_impact.parquet"
 )
 mapping_stations = pd.read_pickle(
-    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_stations.pkl"
+    "https://cph-metro-status.b-cdn.net/mapping_stations.pkl"
 )
 mapping_messages = pd.read_pickle(
-    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/mapping_messages.pkl"
+    "https://cph-metro-status.b-cdn.net/mapping_messages.pkl"
 )
 system_downtime = pd.read_csv(
     mapping_links["system_downtime"],
