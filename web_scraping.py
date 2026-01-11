@@ -3,19 +3,14 @@
 Get data on the CPH Metro's operational status
 ==============================================
 
-Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 16-04-2025
+Author: github.com/cyrilby
+Last meaningful update: 11-01-2026
 
-This script is designed to automatically collect data on the operational
-status of the Copenhagen Metro and record disruptions. In practice, this
-happens by scraping the Metro's website, locating the relevant information
-and then storing it in a local *.pkl and *.csv file.
-
-Note: do not edit the CSV file in Excel as it may mess up the formatting.
-
-Note 2: this script uses Google Chrome instead of MS Edge and requires
-that the corresponding chromedriver is downloaded from here:
-https://developer.chrome.com/docs/chromedriver/downloads
+This script is designed to automatically collect data on the
+operational status of the Copenhagen Metro and record disruptions.
+In practice, this happens by scraping the Metro's website, locating
+the relevant information and then storing it in a *.pkl format in a
+Bunny.net cloud storage zone.
 """
 
 # %% Setting things up
@@ -35,8 +30,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import subprocess
 
-# Importing custom functions for working with ADLS storage
-# from azure_storage import get_access, write_blob
+# For working with Bunny.net object storage
+from bunny_ds import load_credentials, read_bunny_df, write_bunny_df
 
 # Setting up browser options for use in conjuction with Selenium
 chrome_options = Options()
@@ -47,15 +42,6 @@ chrome_options.add_argument("--disable-dev-shm-usage")
 
 # Detecting whether the OS the script is running is Linux or Windows
 linux_os = sys.platform == "linux"
-
-# Specifying the working directory
-if linux_os:
-    script_path = os.path.abspath(__name__)
-else:
-    script_path = os.path.abspath(__file__)
-script_dir = os.path.dirname(script_path)
-os.chdir(script_dir)
-print(f"Note: files will be saved under '{script_dir}'")
 
 # Specifying the URL of the website
 url = "https://m.dk/da/drift-og-service/status-og-planlagte-driftsaendringer/"
@@ -75,6 +61,9 @@ allowed_exceptions = [
     "Vi kører efter planen",
     "Normal togdrift",
 ]
+
+# Loading credentials for Bunny.net storage
+storage = load_credentials()
 
 
 # %% Defining custom functions
@@ -222,8 +211,8 @@ def scrape_status_from_web() -> pd.DataFrame:
 
 # If a file with operational status history exists, we will import it and
 # then append any new data to the bottom of it
-operation_raw = pd.read_pickle(
-    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/operation_raw.pkl"
+operation_raw = read_bunny_df(
+    "operation_raw.pkl", storage["zone_name"], storage["password_read"]
 )
 
 
@@ -273,20 +262,17 @@ operation_raw_updated = operation_raw_updated[["timestamp", "line", "status"]]
 # operation_raw_updated.to_pickle("data/operation_raw.pkl")
 # operation_raw_updated.to_csv("data/operation_raw.csv", index=False)
 
-# Exporting raw data to Azure and confirming success
-azure_conn = get_access("credentials/azure_conn.txt")
-write_blob(operation_raw_updated, azure_conn, "cph-metro-status", "operation_raw.pkl")
-# write_blob(
-#     operation_raw, azure_conn, "cph-metro-status", "operation_raw.csv", index=False
-# )
-print(
-    f"""Data on the metro's operational status successfully scraped
-    and exported to Azure cloud storage as of {formatted_timestamp}."""
+# Exporting raw data to Bunny.net storage and confirming success
+write_bunny_df(
+    operation_raw_updated,
+    "operation_raw.pkl",
+    storage["zone_name"],
+    storage["password_write"],
 )
 
-# Prompting data cleaning & export to Azure data lake storage
-# Note: disabled due to causing issues with too many background processes
-# exec(open("summarize_data.py").read())
-sys.exit()
+print(
+    f"""Data on the metro's operational status successfully scraped
+    and exported to Bunny.net cloud storage as of {formatted_timestamp}."""
+)
 
 # %%
