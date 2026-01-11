@@ -3,8 +3,8 @@
 Format & summarize data on the metro's operational status
 =========================================================
 
-Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 03-04-2025
+Author: github.com/cyrilby
+Last meaningful update: 11-01-2026
 
 In this script, we import data on the Copenhagen Metro's
 operational status collected at different timestamps,
@@ -23,39 +23,22 @@ import pandas as pd
 import numpy as np
 import datetime as dt
 from datetime import time
-import os
-import sys
 import yaml
 
-# Importing custom functions for working with ADLS storage
-from azure_storage import (
-    get_access,
-    write_blob,
-    delete_blob_if_exists,
-)
+# For working with Bunny.net object storage
+from bunny_ds import load_credentials, read_bunny_df, write_bunny_df
+from bunny_ds.core import delete_file
 
-# Detecting whether the OS the script is running is Linux or Windows
-linux_os = sys.platform == "linux"
-
-# Specifying the working directory
-if linux_os:
-    script_path = os.path.abspath(__name__)
-else:
-    script_path = os.path.abspath(__file__)
-script_dir = os.path.dirname(script_path)
-os.chdir(script_dir)
-print(f"Note: files will be saved under '{script_dir}'")
-
-# Arranging for access to Azure cloud storage
-azure_conn = get_access("credentials/azure_conn.txt")
+# Loading credentials for Bunny.net storage
+storage = load_credentials()
 
 # Importing links to mapping tables
 with open("mapping_links.yaml", "r", encoding="utf-8") as file:
     mapping_links = yaml.safe_load(file)
 
-# Importing raw data from Azure
-operation_raw = pd.read_pickle(
-    "https://freelanceprojects.blob.core.windows.net/cph-metro-status/operation_raw.pkl"
+# Importing raw data from Bunny.net storage
+operation_raw = read_bunny_df(
+    "operation_raw.pkl", storage["zone_name"], storage["password_read"]
 )
 
 # Importing mapping tables from Azure
@@ -416,19 +399,18 @@ n_unmapped = len(unmapped_status)
 if n_unmapped:
     print(f"Note: There are {n_unmapped} unmapped status messages in the raw data.")
     print(
-        "Please check the 'unmapped_status_messages.csv' file on Azure and add those messags to the CPH mapping tables Google Sheet."
+        "Please check the 'unmapped_status_messages.xlsx' file on Bunny.net and add those messags to the CPH mapping tables Google Sheet."  # noqa
     )
-    write_blob(
+    write_bunny_df(
         unmapped_status,
-        azure_conn,
-        "cph-metro-status",
         "unmapped_status_messages.xlsx",
-        index=False,
+        storage["zone_name"],
+        storage["password_write"],
     )
 else:
     print("Note: all status messages from the metro's website are mapped.")
-    delete_blob_if_exists(
-        azure_conn, "cph-metro-status", "unmapped_status_messages.xlsx"
+    delete_file(
+        "unmapped_status_messages.xlsx", storage["zone_name"], storage["password_write"]
     )
 
 
@@ -824,13 +806,32 @@ mapping_status = optimize_dataframe(mapping_status)
 # station_impact.to_parquet("data/station_impact.parquet")
 # mapping_stations.to_pickle("data/mapping_stations.pkl")
 
-# Uploading data to Azure data lake storage
-write_blob(operation_fmt, azure_conn, "cph-metro-status", "operation_fmt.parquet")
-write_blob(station_impact, azure_conn, "cph-metro-status", "station_impact.parquet")
-write_blob(mapping_stations, azure_conn, "cph-metro-status", "mapping_stations.pkl")
-write_blob(mapping_status, azure_conn, "cph-metro-status", "mapping_messages.pkl")
+# Uploading data to Bunny.net storage
+write_bunny_df(
+    operation_fmt,
+    "operation_fmt.parquet",
+    storage["zone_name"],
+    storage["password_write"],
+)
+write_bunny_df(
+    station_impact,
+    "station_impact.parquet",
+    storage["zone_name"],
+    storage["password_write"],
+)
+write_bunny_df(
+    mapping_stations,
+    "mapping_stations.pkl",
+    storage["zone_name"],
+    storage["password_write"],
+)
+write_bunny_df(
+    mapping_status,
+    "mapping_messages.pkl",
+    storage["zone_name"],
+    storage["password_write"],
+)
 
-
-print("Note: Data cleaned up and exported to Azure cloud storage.")
+print("Note: Data cleaned up and exported to Bunny.net cloud storage.")
 
 # %%
