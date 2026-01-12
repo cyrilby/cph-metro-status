@@ -4,7 +4,7 @@ Format & summarize data on the metro's operational status
 =========================================================
 
 Author: github.com/cyrilby
-Last meaningful update: 11-01-2026
+Last meaningful update: 12-01-2026
 
 In this script, we import data on the Copenhagen Metro's
 operational status collected at different timestamps,
@@ -24,24 +24,19 @@ import numpy as np
 import datetime as dt
 from datetime import time
 import yaml
+from eazure import get_access, read_blob, write_blob, delete_blob_if_exists
 
-# For working with Bunny.net object storage
-from bunny_ds import load_credentials, read_bunny_df, write_bunny_df
-from bunny_ds.core import delete_file
-
-# Loading credentials for Bunny.net storage
-storage = load_credentials()
+# Loading credentials for cloud storage access
+storage = get_access("AZURE_BLOB_STORAGE")
 
 # Importing links to mapping tables
 with open("mapping_links.yaml", "r", encoding="utf-8") as file:
     mapping_links = yaml.safe_load(file)
 
-# Importing raw data from Bunny.net storage
-operation_raw = read_bunny_df(
-    "operation_raw.pkl", storage["zone_name"], storage["password_read"]
-)
+# Importing raw data from Azure cloud storage
+operation_raw = read_blob(storage, "cph-metro-status", "operation_raw.pkl")
 
-# Importing mapping tables from Azure
+# Importing mapping tables from Google Sheets
 mapping_status = pd.read_csv(mapping_links["mapping_status"])
 
 mapping_hours = pd.read_csv(mapping_links["mapping_hours"])
@@ -399,19 +394,17 @@ n_unmapped = len(unmapped_status)
 if n_unmapped:
     print(f"Note: There are {n_unmapped} unmapped status messages in the raw data.")
     print(
-        "Please check the 'unmapped_status_messages.xlsx' file on Bunny.net and add those messags to the CPH mapping tables Google Sheet."  # noqa
+        "Please check the 'unmapped_status_messages.xlsx' file on Azure and add those messags to the CPH mapping tables Google Sheet."  # noqa
     )
-    write_bunny_df(
+    write_blob(
         unmapped_status,
+        storage,
+        "cph-metro-status",
         "unmapped_status_messages.xlsx",
-        storage["zone_name"],
-        storage["password_write"],
     )
 else:
     print("Note: all status messages from the metro's website are mapped.")
-    delete_file(
-        "unmapped_status_messages.xlsx", storage["zone_name"], storage["password_write"]
-    )
+    delete_blob_if_exists(storage, "cph-metro-status", "unmapped_status_messages.xlsx")
 
 
 # %% Adding status mapping & correcting impacted metro lines
@@ -806,32 +799,32 @@ mapping_status = optimize_dataframe(mapping_status)
 # station_impact.to_parquet("data/station_impact.parquet")
 # mapping_stations.to_pickle("data/mapping_stations.pkl")
 
-# Uploading data to Bunny.net storage
-write_bunny_df(
+# Uploading data to Azure cloud storage
+write_blob(
     operation_fmt,
+    storage,
+    "cph-metro-status",
     "operation_fmt.parquet",
-    storage["zone_name"],
-    storage["password_write"],
 )
-write_bunny_df(
+write_blob(
     station_impact,
-    "station_impact.parquet",
-    storage["zone_name"],
-    storage["password_write"],
+    storage,
+    "cph-metro-status",
+    "station_impact.pkl",
 )
-write_bunny_df(
+write_blob(
     mapping_stations,
+    storage,
+    "cph-metro-status",
     "mapping_stations.pkl",
-    storage["zone_name"],
-    storage["password_write"],
 )
-write_bunny_df(
+write_blob(
     mapping_status,
+    storage,
+    "cph-metro-status",
     "mapping_messages.pkl",
-    storage["zone_name"],
-    storage["password_write"],
 )
 
-print("Note: Data cleaned up and exported to Bunny.net cloud storage.")
+print("Note: Data cleaned up and exported to Azure cloud storage.")
 
 # %%

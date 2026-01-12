@@ -4,13 +4,13 @@ Get data on the CPH Metro's operational status
 ==============================================
 
 Author: github.com/cyrilby
-Last meaningful update: 11-01-2026
+Last meaningful update: 12-01-2026
 
 This script is designed to automatically collect data on the
 operational status of the Copenhagen Metro and record disruptions.
 In practice, this happens by scraping the Metro's website, locating
 the relevant information and then storing it in a *.pkl format in a
-Bunny.net cloud storage zone.
+Azure cloud storage zone.
 """
 
 # %% Setting things up
@@ -29,9 +29,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import subprocess
-
-# For working with Bunny.net object storage
-from bunny_ds import load_credentials, read_bunny_df, write_bunny_df
+from eazure import get_access, read_blob, write_blob
 
 # Setting up browser options for use in conjuction with Selenium
 chrome_options = Options()
@@ -62,25 +60,11 @@ allowed_exceptions = [
     "Normal togdrift",
 ]
 
-# Loading credentials for Bunny.net storage
-storage = load_credentials()
+# Loading credentials for cloud storage access
+storage = get_access("AZURE_BLOB_STORAGE")
 
 
 # %% Defining custom functions
-
-
-# Custom function to check if file exists
-def file_exists(filepath: str) -> bool:
-    """
-    Checks whether a local file exists.
-
-    Args:
-        filepath (str): filepath to check
-
-    Returns:
-        bool: whether or not the file exists
-    """
-    return os.path.isfile(filepath)
 
 
 # Custom function to scrape the HTML content of a web page
@@ -211,9 +195,7 @@ def scrape_status_from_web() -> pd.DataFrame:
 
 # If a file with operational status history exists, we will import it and
 # then append any new data to the bottom of it
-operation_raw = read_bunny_df(
-    "operation_raw.pkl", storage["zone_name"], storage["password_read"]
-)
+operation_raw = read_blob(storage, "cph-metro-status", "operation_raw.pkl")
 
 
 # %% Scraping the Copenhagen Metro's website for new data
@@ -262,17 +244,17 @@ operation_raw_updated = operation_raw_updated[["timestamp", "line", "status"]]
 # operation_raw_updated.to_pickle("data/operation_raw.pkl")
 # operation_raw_updated.to_csv("data/operation_raw.csv", index=False)
 
-# Exporting raw data to Bunny.net storage and confirming success
-write_bunny_df(
+# Exporting raw data to Azure storage and confirming success
+write_blob(
     operation_raw_updated,
+    storage,
+    "cph-metro-status",
     "operation_raw.pkl",
-    storage["zone_name"],
-    storage["password_write"],
 )
 
 print(
     f"""Data on the metro's operational status successfully scraped
-    and exported to Bunny.net cloud storage as of {formatted_timestamp}."""
+    and exported to Azure cloud storage as of {formatted_timestamp}."""
 )
 
 # %%
