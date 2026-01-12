@@ -810,7 +810,7 @@ write_blob(
     station_impact,
     storage,
     "cph-metro-status",
-    "station_impact.pkl",
+    "station_impact.parquet",
 )
 write_blob(
     mapping_stations,
