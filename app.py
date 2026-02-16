@@ -26,6 +26,7 @@ import plotly.express as px
 import plotly.io as pio
 from plotly_calplot import calplot
 import yaml
+from storage import get_s3_access
 
 # Importing long text strings used in the app
 with open("text.yaml", "r", encoding="utf-8") as file:
@@ -34,6 +35,9 @@ with open("text.yaml", "r", encoding="utf-8") as file:
 # Importing links to mapping tables
 with open("mapping_links.yaml", "r", encoding="utf-8") as file:
     mapping_links = yaml.safe_load(file)
+
+# Importing the credentials for working with object storage
+storage_options, bucket = get_s3_access()
 
 
 # %% HTML and color customization
@@ -87,23 +91,23 @@ def customize_colors():
 
 # %% Importing data for use in the app
 
-# Importing pre-processed data & relevant mapping tables from Azure
+# Importing pre-processed data & relevant mapping tables from cloud storage
 operation_fmt = pd.read_parquet(
-    "https://cph-metro-status.b-cdn.net/operation_fmt.parquet"
+    f"s3://{bucket}/operation_fmt.parquet", storage_options=storage_options
 )
 station_impact = pd.read_parquet(
-    "https://cph-metro-status.b-cdn.net/station_impact.parquet"
+    f"s3://{bucket}/station_impact.parquet", storage_options=storage_options
 )
 mapping_stations = pd.read_pickle(
-    "https://cph-metro-status.b-cdn.net/mapping_stations.pkl"
+    f"s3://{bucket}/mapping_stations.pkl", storage_options=storage_options
 )
 mapping_messages = pd.read_pickle(
-    "https://cph-metro-status.b-cdn.net/mapping_messages.pkl"
+    f"s3://{bucket}/mapping_messages.pkl", storage_options=storage_options
 )
-system_downtime = pd.read_csv(
-    mapping_links["system_downtime"],
-    parse_dates=["date", "last_modified"],
-    date_format="%d/%m/%Y",
+system_downtime = pd.read_excel(
+    f"s3://{bucket}/mapping_tables.xlsx",
+    sheet_name="system_downtime",
+    storage_options=storage_options,
 )
 
 # Correcting dtypes

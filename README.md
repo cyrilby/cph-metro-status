@@ -16,7 +16,7 @@ The project consists of four scripts, which are described shortly below.
 * The raw data fetched in the process is then stored in a `pickle` file, after which point it is subjected to further data processing which standardizes the operational status messages and details their implications for passengers.
 * The web scraping of the data requires the use of a browser instance (implemented using the `selenium` package) to download the correct data.
 * Finally, some data visualizations are prepared based on the processed data and are made available via the official [Streamlit app](https://cph-metro.streamlit.app/).
-* All data used in the process are stored on Azure, with free public read-only access. The data are also presented in a Streamlit app, as described in the next section.
+* All data used in the process are stored on S3-compatible cloud storage, with free public read-only access. The data are also presented in a Streamlit app, as described in the next section.
 
 ## app.py
 
@@ -24,11 +24,11 @@ This script contains the source code of the Streamlit app accompanying the CPH m
 
 ## web_scraping.py
 
-This script is designed to automatically collect data on the operational status of the Copenhagen Metro and record disruptions. In practice, this happens by scraping the Metro's website, locating the relevant information and then storing it on Azure as a `*.pkl` file.
+This script is designed to automatically collect data on the operational status of the Copenhagen Metro and record disruptions. In practice, this happens by scraping the Metro's website, locating the relevant information and then storing it in the cloud as a `*.pkl` file.
 
 ## data_cleaning.py
 
-In this script, we import data on the Copenhagen Metro's operational status collected at different timestamps, then add some information on what the status recorded means, then create various tables containing aggregate data. These tables are then exported to Azure and can be used for data visualization etc.
+In this script, we import data on the Copenhagen Metro's operational status collected at different timestamps, then add some information on what the status recorded means, then create various tables containing aggregate data. These tables are then exported to cloud storage and can be used for data visualization etc.
 
 ## Jupyter notebooks for sanity checks
 
