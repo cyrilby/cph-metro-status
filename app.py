@@ -91,7 +91,7 @@ def customize_colors():
 
 # %% Importing data for use in the app
 
-# Importing pre-processed data & relevant mapping tables from Azure
+# Importing pre-processed data & relevant mapping tables from cloud storage
 operation_fmt = pd.read_parquet(
     f"s3://{bucket}/operation_fmt.parquet", storage_options=storage_options
 )

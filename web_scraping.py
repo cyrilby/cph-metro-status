@@ -245,7 +245,7 @@ operation_raw_updated = operation_raw_updated[["timestamp", "line", "status"]]
 # operation_raw_updated.to_pickle("data/operation_raw.pkl")
 # operation_raw_updated.to_csv("data/operation_raw.csv", index=False)
 
-# Exporting raw data to Azure storage and confirming success
+# Exporting raw data to cloud storage and confirming success
 operation_raw_updated.to_pickle(
     f"s3://{bucket}/operation_raw.pkl",
     storage_options=storage_options,
