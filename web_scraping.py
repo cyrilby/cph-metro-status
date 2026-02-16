@@ -4,13 +4,12 @@ Get data on the CPH Metro's operational status
 ==============================================
 
 Author: github.com/cyrilby
-Last meaningful update: 12-01-2026
+Last meaningful update: 16-02-2026
 
 This script is designed to automatically collect data on the
 operational status of the Copenhagen Metro and record disruptions.
 In practice, this happens by scraping the Metro's website, locating
-the relevant information and then storing it in a *.pkl format in a
-Azure cloud storage zone.
+the relevant information and then storing it in a *.pkl format in a cloud storage zone.
 """
 
 # %% Setting things up
@@ -29,7 +28,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import subprocess
-from eazure import get_access, read_blob, write_blob
+from storage import get_s3_access
 
 # Setting up browser options for use in conjuction with Selenium
 chrome_options = Options()
@@ -60,8 +59,8 @@ allowed_exceptions = [
     "Normal togdrift",
 ]
 
-# Loading credentials for cloud storage access
-storage = get_access("AZURE_BLOB_STORAGE")
+# Importing the credentials for working with object storage
+storage_options, bucket = get_s3_access()
 
 
 # %% Defining custom functions
@@ -195,7 +194,9 @@ def scrape_status_from_web() -> pd.DataFrame:
 
 # If a file with operational status history exists, we will import it and
 # then append any new data to the bottom of it
-operation_raw = read_blob(storage, "cph-metro-status", "operation_raw.pkl")
+operation_raw = pd.read_pickle(
+    f"s3://{bucket}/operation_raw.pkl", storage_options=storage_options
+)
 
 
 # %% Scraping the Copenhagen Metro's website for new data
@@ -245,16 +246,14 @@ operation_raw_updated = operation_raw_updated[["timestamp", "line", "status"]]
 # operation_raw_updated.to_csv("data/operation_raw.csv", index=False)
 
 # Exporting raw data to Azure storage and confirming success
-write_blob(
-    operation_raw_updated,
-    storage,
-    "cph-metro-status",
-    "operation_raw.pkl",
+operation_raw_updated.to_pickle(
+    f"s3://{bucket}/operation_raw.pkl",
+    storage_options=storage_options,
 )
 
 print(
     f"""Data on the metro's operational status successfully scraped
-    and exported to Azure cloud storage as of {formatted_timestamp}."""
+    and exported to cloud storage as of {formatted_timestamp}."""
 )
 
 # %%

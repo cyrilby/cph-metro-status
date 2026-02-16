@@ -4,7 +4,7 @@ Format & summarize data on the metro's operational status
 =========================================================
 
 Author: github.com/cyrilby
-Last meaningful update: 12-01-2026
+Last meaningful update: 16-02-2026
 
 In this script, we import data on the Copenhagen Metro's
 operational status collected at different timestamps,
@@ -24,31 +24,45 @@ import numpy as np
 import datetime as dt
 from datetime import time
 import yaml
-from eazure import get_access, read_blob, write_blob, delete_blob_if_exists
+from storage import get_s3_access
 
-# Loading credentials for cloud storage access
-storage = get_access("AZURE_BLOB_STORAGE")
+# Importing the credentials for working with object storage
+storage_options, bucket = get_s3_access()
 
 # Importing links to mapping tables
 with open("mapping_links.yaml", "r", encoding="utf-8") as file:
     mapping_links = yaml.safe_load(file)
 
-# Importing raw data from Azure cloud storage
-operation_raw = read_blob(storage, "cph-metro-status", "operation_raw.pkl")
+# Importing raw data from cloud storage
+operation_raw = pd.read_pickle(
+    f"s3://{bucket}/operation_raw.pkl", storage_options=storage_options
+)
 
-# Importing mapping tables from Google Sheets
-mapping_status = pd.read_csv(mapping_links["mapping_status"])
-
-mapping_hours = pd.read_csv(mapping_links["mapping_hours"])
-
-mapping_rush = pd.read_csv(mapping_links["mapping_rush"])
-
-mapping_stations = pd.read_csv(mapping_links["mapping_stations"])
-
-system_downtime = pd.read_csv(
-    mapping_links["system_downtime"],
-    parse_dates=["date", "last_modified"],
-    date_format="%d/%m/%Y",
+# Importing user-maintained mapping tables
+mapping_status = pd.read_excel(
+    f"s3://{bucket}/mapping_tables.xlsx",
+    sheet_name="status",
+    storage_options=storage_options,
+)
+mapping_hours = pd.read_excel(
+    f"s3://{bucket}/mapping_tables.xlsx",
+    sheet_name="hours",
+    storage_options=storage_options,
+)
+mapping_rush = pd.read_excel(
+    f"s3://{bucket}/mapping_tables.xlsx",
+    sheet_name="rush_hour",
+    storage_options=storage_options,
+)
+mapping_stations = pd.read_excel(
+    f"s3://{bucket}/mapping_tables.xlsx",
+    sheet_name="stations",
+    storage_options=storage_options,
+)
+system_downtime = pd.read_excel(
+    f"s3://{bucket}/mapping_tables.xlsx",
+    sheet_name="system_downtime",
+    storage_options=storage_options,
 )
 
 # Default "Normal" status to be used in cases where messages displayed
@@ -317,20 +331,16 @@ operation_fmt["eomonth"] = operation_fmt["date"] + pd.offsets.MonthEnd(0)
 morning_rush_start = mapping_rush[mapping_rush["rush_hour"] == "Morning"]["start"].iloc[
     0
 ]
-morning_rush_start = pd.to_datetime(morning_rush_start).time()
 
 morning_rush_end = mapping_rush[mapping_rush["rush_hour"] == "Morning"]["end"].iloc[0]
-morning_rush_end = pd.to_datetime(morning_rush_end).time()
 
 afternoon_rush_start = mapping_rush[mapping_rush["rush_hour"] == "Afternoon"][
     "start"
 ].iloc[0]
-afternoon_rush_start = pd.to_datetime(afternoon_rush_start).time()
 
 afternoon_rush_end = mapping_rush[mapping_rush["rush_hour"] == "Afternoon"]["end"].iloc[
     0
 ]
-afternoon_rush_end = pd.to_datetime(afternoon_rush_end).time()
 
 conditions = [
     (operation_fmt["time"] >= morning_rush_start)
@@ -393,18 +403,8 @@ n_unmapped = len(unmapped_status)
 # Printing a confirmation
 if n_unmapped:
     print(f"Note: There are {n_unmapped} unmapped status messages in the raw data.")
-    print(
-        "Please check the 'unmapped_status_messages.xlsx' file on Azure and add those messags to the CPH mapping tables Google Sheet."  # noqa
-    )
-    write_blob(
-        unmapped_status,
-        storage,
-        "cph-metro-status",
-        "unmapped_status_messages.xlsx",
-    )
 else:
     print("Note: all status messages from the metro's website are mapped.")
-    delete_blob_if_exists(storage, "cph-metro-status", "unmapped_status_messages.xlsx")
 
 
 # %% Adding status mapping & correcting impacted metro lines
@@ -799,32 +799,24 @@ mapping_status = optimize_dataframe(mapping_status)
 # station_impact.to_parquet("data/station_impact.parquet")
 # mapping_stations.to_pickle("data/mapping_stations.pkl")
 
-# Uploading data to Azure cloud storage
-write_blob(
-    operation_fmt,
-    storage,
-    "cph-metro-status",
-    "operation_fmt.parquet",
+# Uploading data to cloud storage
+operation_fmt.to_parquet(
+    f"s3://{bucket}/operation_fmt.parquet",
+    storage_options=storage_options,
 )
-write_blob(
-    station_impact,
-    storage,
-    "cph-metro-status",
-    "station_impact.parquet",
+station_impact.to_parquet(
+    f"s3://{bucket}/station_impact.parquet",
+    storage_options=storage_options,
 )
-write_blob(
-    mapping_stations,
-    storage,
-    "cph-metro-status",
-    "mapping_stations.pkl",
+mapping_stations.to_pickle(
+    f"s3://{bucket}/mapping_stations.pkl",
+    storage_options=storage_options,
 )
-write_blob(
-    mapping_status,
-    storage,
-    "cph-metro-status",
-    "mapping_messages.pkl",
+mapping_status.to_pickle(
+    f"s3://{bucket}/mapping_messages.pkl",
+    storage_options=storage_options,
 )
 
-print("Note: Data cleaned up and exported to Azure cloud storage.")
+print("Note: Data cleaned up and exported to cloud storage.")
 
 # %%
