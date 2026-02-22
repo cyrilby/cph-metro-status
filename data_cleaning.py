@@ -4,7 +4,7 @@ Format & summarize data on the metro's operational status
 =========================================================
 
 Author: github.com/cyrilby
-Last meaningful update: 16-02-2026
+Last meaningful update: 22-02-2026
 
 In this script, we import data on the Copenhagen Metro's
 operational status collected at different timestamps,
@@ -39,30 +39,18 @@ operation_raw = pd.read_pickle(
 )
 
 # Importing user-maintained mapping tables
-mapping_status = pd.read_excel(
-    f"s3://{bucket}/mapping_tables.xlsx",
-    sheet_name="status",
-    storage_options=storage_options,
-)
-mapping_hours = pd.read_excel(
-    f"s3://{bucket}/mapping_tables.xlsx",
-    sheet_name="hours",
-    storage_options=storage_options,
-)
-mapping_rush = pd.read_excel(
-    f"s3://{bucket}/mapping_tables.xlsx",
-    sheet_name="rush_hour",
-    storage_options=storage_options,
-)
-mapping_stations = pd.read_excel(
-    f"s3://{bucket}/mapping_tables.xlsx",
-    sheet_name="stations",
-    storage_options=storage_options,
-)
-system_downtime = pd.read_excel(
-    f"s3://{bucket}/mapping_tables.xlsx",
-    sheet_name="system_downtime",
-    storage_options=storage_options,
+mapping_status = pd.read_csv(mapping_links["mapping_status"])
+
+mapping_hours = pd.read_csv(mapping_links["mapping_hours"])
+
+mapping_rush = pd.read_csv(mapping_links["mapping_rush"])
+
+mapping_stations = pd.read_csv(mapping_links["mapping_stations"])
+
+system_downtime = pd.read_csv(
+    mapping_links["system_downtime"],
+    parse_dates=["date", "last_modified"],
+    date_format="%d/%m/%Y",
 )
 
 # Default "Normal" status to be used in cases where messages displayed
@@ -331,16 +319,20 @@ operation_fmt["eomonth"] = operation_fmt["date"] + pd.offsets.MonthEnd(0)
 morning_rush_start = mapping_rush[mapping_rush["rush_hour"] == "Morning"]["start"].iloc[
     0
 ]
+morning_rush_start = pd.to_datetime(morning_rush_start).time()
 
 morning_rush_end = mapping_rush[mapping_rush["rush_hour"] == "Morning"]["end"].iloc[0]
+morning_rush_end = pd.to_datetime(morning_rush_end).time()
 
 afternoon_rush_start = mapping_rush[mapping_rush["rush_hour"] == "Afternoon"][
     "start"
 ].iloc[0]
+afternoon_rush_start = pd.to_datetime(afternoon_rush_start).time()
 
 afternoon_rush_end = mapping_rush[mapping_rush["rush_hour"] == "Afternoon"]["end"].iloc[
     0
 ]
+afternoon_rush_end = pd.to_datetime(afternoon_rush_end).time()
 
 conditions = [
     (operation_fmt["time"] >= morning_rush_start)

@@ -104,10 +104,10 @@ mapping_stations = pd.read_pickle(
 mapping_messages = pd.read_pickle(
     f"s3://{bucket}/mapping_messages.pkl", storage_options=storage_options
 )
-system_downtime = pd.read_excel(
-    f"s3://{bucket}/mapping_tables.xlsx",
-    sheet_name="system_downtime",
-    storage_options=storage_options,
+system_downtime = pd.read_csv(
+    mapping_links["system_downtime"],
+    parse_dates=["date", "last_modified"],
+    date_format="%d/%m/%Y",
 )
 
 # Correcting dtypes
