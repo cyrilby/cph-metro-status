@@ -660,6 +660,21 @@ def general_overview():
     }
     cal_data["interpretation"] = cal_data["disruption_score"].map(status_dict)
 
+    # Creating summary KPIs to show above chart
+    cal_kpi = cal_data.copy()
+    # KPI 1: % of days with normal service
+    cal_kpi_normal = cal_data[cal_data["disruption_score"] == 0]
+    cal_kpi_normal = len(cal_kpi_normal) / len(cal_kpi)
+    cal_kpi_normal = round(100 * cal_kpi_normal, 1)
+    # KPI 2: % of days with partial disruptions
+    cal_kpi_partial = cal_data[cal_data["disruption_score"] == 1]
+    cal_kpi_partial = len(cal_kpi_partial) / len(cal_kpi)
+    cal_kpi_partial = round(100 * cal_kpi_partial, 1)
+    # KPI 3: % of days with complete disruptions
+    cal_kpi_complete = cal_data[cal_data["disruption_score"] == 2]
+    cal_kpi_complete = len(cal_kpi_complete) / len(cal_kpi)
+    cal_kpi_complete = round(100 * cal_kpi_complete, 1)
+
     # Recording metadata on the daily disruption score for use on chart
     cal_start_month = cal_data["date"].dt.month.min()
     cal_end_month = cal_data["date"].dt.month.max()
@@ -730,8 +745,20 @@ def general_overview():
     plot_or_not(detailed_chart, detailed_split)
 
     # Plotting a calendar-based overview
+    # Note: we also plot a new set of 3 calendar KPIs
     st.subheader("Daily service reliability", divider="grey")
+
     st.markdown(cal_desc, unsafe_allow_html=True)
+
+    cal_metric1, cal_metric2, cal_metric3 = st.columns(3)
+    cal_metric1.metric("% of days without disruptions", str(cal_kpi_normal) + "%")
+    cal_metric2.metric("% of days with partial disruptions", str(cal_kpi_partial) + "%")
+    cal_metric3.metric(
+        "% of days with complete disruptions", str(cal_kpi_complete) + "%"
+    )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
     plot_or_not(cal_fig, cal_data)
 
 
