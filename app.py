@@ -797,6 +797,7 @@ def disruption_reasons():
     ].copy()
     data_to_display = data_to_display.sort_values("date")
     data_to_display = data_to_display.reset_index(drop=True)
+    n_days = data_to_display["date"].nunique()
 
     # Dealing with periods of system downtime
     data_to_display, downtime_msg = deal_with_downtime(data_to_display, selected_rows)
@@ -988,6 +989,7 @@ def disruption_impact():
     ].copy()
     data_to_display = data_to_display.sort_values("date")
     data_to_display = data_to_display.reset_index(drop=True)
+    n_days = data_to_display["date"].nunique()
 
     # Filtering and arranging the station impact data
     st_data_to_display = station_impact[
@@ -1593,6 +1595,7 @@ def disruption_history():
     ].copy()
     data_to_display = data_to_display.sort_values("date")
     data_to_display = data_to_display.reset_index(drop=True)
+    n_days = data_to_display["date"].nunique()
 
     # Dealing with periods of system downtime
     data_to_display, downtime_msg = deal_with_downtime(data_to_display, selected_rows)
