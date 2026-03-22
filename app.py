@@ -215,7 +215,7 @@ options = st.sidebar.radio(
     options=[
         "Welcome",
         "Overview",
-        "Daily overview",
+        "Daily reliability",
         "Disruption reasons",
         "Disruption impact",
         "Disruption history",
@@ -751,9 +751,105 @@ def daily_reliability():
         + downtime_msg
     )
 
-    # Preparing datasets with N of days without disrruptions
-    # aggregated by month´
-    st.dataframe(reliability.head(5))  # WIP as of 22-03-2026
+    # Preparing a dataset with N of days without any disrruptions
+    # aggregated by month
+    hist_no_disr = reliability.copy()
+    hist_no_disr["month"] = hist_no_disr["date"].dt.to_period("M").dt.to_timestamp()
+    hist_no_disr["day_no_disr"] = hist_no_disr["disruption_score"] == 0
+    hist_no_disr["days_without_disruption"] = hist_no_disr.groupby("month")[
+        "day_no_disr"
+    ].transform("mean")
+    hist_no_disr["days_without_disruption"] = (
+        100 * hist_no_disr["days_without_disruption"]
+    )
+    hist_no_disr["days_without_disruption"] = hist_no_disr[
+        "days_without_disruption"
+    ].round(1)
+    hist_no_disr = hist_no_disr[["month", "days_without_disruption"]]
+    hist_no_disr = hist_no_disr.sort_values("month")
+    hist_no_disr = hist_no_disr.drop_duplicates()
+    hist_no_disr = hist_no_disr.reset_index(drop=True)
+
+    # Preparing a dataset with N of days with partial disruptions
+    # aggregated by month
+    hist_partial_disr = reliability.copy()
+    hist_partial_disr["month"] = (
+        hist_partial_disr["date"].dt.to_period("M").dt.to_timestamp()
+    )
+    hist_partial_disr["day_disr"] = hist_partial_disr["disruption_score"] == 1
+    hist_partial_disr["days_with_disruption"] = hist_partial_disr.groupby("month")[
+        "day_disr"
+    ].transform("mean")
+    hist_partial_disr["days_with_disruption"] = (
+        100 * hist_partial_disr["days_with_disruption"]
+    )
+    hist_partial_disr["days_with_disruption"] = hist_partial_disr[
+        "days_with_disruption"
+    ].round(1)
+    hist_partial_disr = hist_partial_disr[["month", "days_with_disruption"]]
+    hist_partial_disr = hist_partial_disr.sort_values("month")
+    hist_partial_disr = hist_partial_disr.drop_duplicates()
+    hist_partial_disr = hist_partial_disr.reset_index(drop=True)
+
+    # Preparing a dataset with N of days with partial disruptions
+    # aggregated by month
+    hist_complete_disr = reliability.copy()
+    hist_complete_disr["month"] = (
+        hist_complete_disr["date"].dt.to_period("M").dt.to_timestamp()
+    )
+    hist_complete_disr["day_disr"] = hist_complete_disr["disruption_score"] == 2
+    hist_complete_disr["days_with_disruption"] = hist_complete_disr.groupby("month")[
+        "day_disr"
+    ].transform("mean")
+    hist_complete_disr["days_with_disruption"] = (
+        100 * hist_complete_disr["days_with_disruption"]
+    )
+    hist_complete_disr["days_with_disruption"] = hist_complete_disr[
+        "days_with_disruption"
+    ].round(1)
+    hist_complete_disr = hist_complete_disr[["month", "days_with_disruption"]]
+    hist_complete_disr = hist_complete_disr.sort_values("month")
+    hist_complete_disr = hist_complete_disr.drop_duplicates()
+    hist_complete_disr = hist_complete_disr.reset_index(drop=True)
+
+    # Creating a line chart showing % of days without disruptions
+    # aggregated by month
+    pct_no_disr_chart = px.line(
+        hist_no_disr,
+        x="month",
+        y="days_without_disruption",
+    )
+    pct_no_disr_chart.update_layout(
+        title_text="% of days without any service disruptions by month"
+    )
+    pct_no_disr_chart.update_xaxes(title_text="Month")
+    pct_no_disr_chart.update_yaxes(title_text="% of days in month")
+
+    # Creating a line chart showing % of days with partial
+    # disruptions aggregated by month
+    pct_partial_disr_chart = px.line(
+        hist_partial_disr,
+        x="month",
+        y="days_with_disruption",
+    )
+    pct_partial_disr_chart.update_layout(
+        title_text="% of days with partial service disruption(s) by month"
+    )
+    pct_partial_disr_chart.update_xaxes(title_text="Month")
+    pct_partial_disr_chart.update_yaxes(title_text="% of days in month")
+
+    # Creating a line chart showing % of days with complete
+    # disruptions aggregated by month
+    pct_complete_disr_chart = px.line(
+        hist_complete_disr,
+        x="month",
+        y="days_with_disruption",
+    )
+    pct_complete_disr_chart.update_layout(
+        title_text="% of days with complete service disruption(s) by month"
+    )
+    pct_complete_disr_chart.update_xaxes(title_text="Month")
+    pct_complete_disr_chart.update_yaxes(title_text="% of days in month")
 
     # Creating summary KPIs to show above chart
     cal_kpi = recent_reliability.copy()
@@ -810,13 +906,22 @@ def daily_reliability():
 
     # Plotting a calendar-based overview
     # Note: we also plot a new set of 3 calendar KPIs
-    st.subheader("Recent daily service reliability", divider="grey")
+    st.subheader(f"Service reliability between {selected_period}", divider="grey")
     st.markdown(cal_desc, unsafe_allow_html=True)
     plot_or_not(cal_fig, recent_reliability)
 
-    # Plotting historical data aggregated by month [WIP as of 22-03-2026]
-    st.subheader("Days without any disruptions", divider="grey")
+    # Plotting historical data aggregated by month
+    st.subheader("Days without any disruptions by month", divider="grey")
     st.markdown(text["daily_page_hist_no_disr"])
+    plot_or_not(pct_no_disr_chart, hist_no_disr)
+
+    st.subheader("Days with partial disruption(s) by month", divider="grey")
+    st.markdown(text["daily_page_hist_no_disr"])  # WIP as of 22-03-2026
+    plot_or_not(pct_partial_disr_chart, hist_partial_disr)
+
+    st.subheader("Days with complete disruption(s) by month", divider="grey")
+    st.markdown(text["daily_page_hist_no_disr"])  # WIP as of 22-03-2026
+    plot_or_not(pct_complete_disr_chart, hist_complete_disr)
 
 
 # %% Page: service disruption insights
@@ -1647,7 +1752,6 @@ def disruption_history():
     ].copy()
     data_to_display = data_to_display.sort_values("date")
     data_to_display = data_to_display.reset_index(drop=True)
-    n_days = data_to_display["date"].nunique()
 
     # Dealing with periods of system downtime
     data_to_display, downtime_msg = deal_with_downtime(data_to_display, selected_rows)
@@ -1968,7 +2072,7 @@ if options == "Welcome":
     show_homepage()
 elif options == "Overview":
     general_overview()
-elif options == "Daily overview":
+elif options == "Daily reliability":
     daily_reliability()
 elif options == "Disruption reasons":
     disruption_reasons()
