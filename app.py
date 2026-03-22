@@ -4,7 +4,7 @@ App visualizing the CPH Metro's operational status
 ==================================================
 
 Author: kirilboyanovbg[at]gmail.com
-Last meaningful update: 11-01-2026
+Last meaningful update: 22-03-2026
 
 This script contains the source code of the Streamlit
 app accompanying the CPH metro scraper tool. In here,
@@ -155,17 +155,22 @@ unique_day_names = [
     "Sunday",
 ]
 
+# Importing user-maintained mapping tables
+mapping_status = pd.read_csv(mapping_links["mapping_status"])
+
 # Detecting whether there are any unmapped service status messages
 # as well as the date(s) where data accuracy may be impacted due to lacking mapping
 unmapped_msg = operation_fmt[
-    (operation_fmt["status_en"] == "Unknown")
-    & (operation_fmt["status_dk"] != "Unknown")
-][["date", "status_en", "status_dk"]].copy()
+    ~operation_fmt["status_dk"].isin(mapping_status["status_dk"])
+]
+unmapped_msg = unmapped_msg[["date", "status_en", "status_dk"]]
+
 unmapped_rows = len(unmapped_msg)
 total_rows = len(operation_fmt)
 unmappped_rows_pct = round(100 * ((unmapped_rows + 1) / total_rows), 1)
 unmapped_msg = unmapped_msg.drop_duplicates(subset="status_dk")
 unmapped_msg_n = len(unmapped_msg)
+
 if unmapped_msg_n:
     unmapped_msg_date_min = unmapped_msg["date"].min()
     unmapped_msg_date_max = unmapped_msg["date"].max()

@@ -4,7 +4,7 @@ Format & summarize data on the metro's operational status
 =========================================================
 
 Author: github.com/cyrilby
-Last meaningful update: 22-02-2026
+Last meaningful update: 22-03-2026
 
 In this script, we import data on the Copenhagen Metro's
 operational status collected at different timestamps,
@@ -567,15 +567,15 @@ for col in numeric_cols:
     )
 
 # Imputing "Unknown" for the "status_en" and "Unspecified" for the "reason" columns
-operation_fmt["status_en"] = operation_fmt["status_en"].fillna("Unknown")
+operation_fmt["status_en"] = operation_fmt["status_en"].fillna("Unmapped")
 operation_fmt["reason"] = operation_fmt["reason"].fillna("Unspecified")
 
 # Adding information on whether the added status is a disruption or not
-disruption_msg = ["Normal service", "Unknown", np.nan]
+disruption_msg = ["Normal service", "Unknown", "Unmapped", np.nan]
 operation_fmt["status_disruption"] = ~operation_fmt["status_en"].isin(disruption_msg)
 
 # Creating a short status column
-unchanged_msg = ["Normal service", "Unknown", "Closed for maintenance"]
+unchanged_msg = ["Normal service", "Unknown", "Unmapped", "Closed for maintenance"]
 operation_fmt["status_en_short"] = np.where(
     operation_fmt["status_en"].isin(unchanged_msg),
     operation_fmt["status_en"],
