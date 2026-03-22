@@ -1765,25 +1765,42 @@ def disruption_history():
         + downtime_msg
     )
 
-    # Preparing data for daily disruptions
+    # Preparing data on disruption durations
     daily_disruption = data_to_display.copy()
+    daily_disruption["time_diff"] = (
+        daily_disruption["disruption_end"] - daily_disruption["disruption_start"]
+    ).abs()
+
+    daily_disruption = daily_disruption.loc[
+        daily_disruption.groupby(["status_dk", "disruption_end"], observed=True)[
+            "time_diff"
+        ].idxmin()
+    ].copy()
+
+    # Preparing data for daily disruptions
     vars_for_group = ["status_en_short", "date"]
+
     daily_disruption["rows_for_status"] = daily_disruption.groupby(vars_for_group)[
         "date"
     ].transform("count")
+
     daily_disruption["unique_msg"] = daily_disruption.groupby(vars_for_group)[
         "status_dk"
     ].transform("nunique")
+
     daily_disruption["rows_for_date"] = daily_disruption.groupby("date")[
         "date"
     ].transform("count")
+
     daily_disruption["status_pct"] = 100 * (
         daily_disruption["rows_for_status"] / daily_disruption["rows_for_date"]
     )
+
     daily_disruption["avg_disr_dur_hours"] = daily_disruption.groupby(vars_for_group)[
         "disruption_duration_hours"
     ].transform("mean")
     daily_disruption["status_pct"] = np.round(daily_disruption["status_pct"], 1)
+
     daily_disruption["avg_disr_dur_hours"] = np.round(
         daily_disruption["avg_disr_dur_hours"], 1
     )
@@ -1791,16 +1808,39 @@ def disruption_history():
     daily_disruption = daily_disruption[
         daily_disruption["status_en_short"] == "Disruption"
     ].copy()
+
     daily_disruption = daily_disruption.reset_index(drop=True)
     daily_disruption = pd.merge(date_range, daily_disruption, on="date", how="left")
     daily_disruption = daily_disruption.set_index("date")
     daily_disruption = daily_disruption.asfreq("D")
     daily_disruption = daily_disruption.reset_index()
+
+    # Dealing with extreme cases (outliers can
+    # occur if the same service message appears
+    # at several very different points in time)
+    observed_med = daily_disruption["avg_disr_dur_hours"].median()
+    tolerance_lvl = 100 * observed_med
+
+    # Note: an outlier is defined as a duration
+    # 100 times or more higher than the median
+    # duration observed in the given period
+    daily_disruption["avg_disr_dur_hours"] = np.where(
+        daily_disruption["avg_disr_dur_hours"] <= tolerance_lvl,
+        daily_disruption["avg_disr_dur_hours"],
+        np.nan,
+    )
+
+    # Dealing with potential NANs (we don't always have disruptions)
     daily_disruption["status_pct"] = daily_disruption["status_pct"].fillna(0)
+
     daily_disruption["unique_msg"] = daily_disruption["unique_msg"].fillna(0)
+
+    # Note: for this specific indicator, we
+    # impute with the average so as not to skew
+    # our subsequent data aggregation
     daily_disruption["avg_disr_dur_hours"] = daily_disruption[
         "avg_disr_dur_hours"
-    ].fillna(0)
+    ].fillna(daily_disruption["avg_disr_dur_hours"].mean())
 
     # Preparing data for the N of stations impacted by day
     n_total_stations = len(mapping_stations["station"].unique())
