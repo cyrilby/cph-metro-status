@@ -690,21 +690,59 @@ def daily_reliability():
     reliability = operation_fmt[operation_fmt["day_type"].isin(day_types)].copy()
     reliability = reliability[reliability["official_rush_hour"].isin(hour_types)].copy()
     reliability = reliability[reliability["line"].isin(selected_lines)].copy()
+    reliability = reliability.sort_values("date")
+    reliability = reliability.reset_index(drop=True)
+
+    # Dealing with periods of system downtime
+    reliability, downtime_msg = deal_with_downtime(reliability, selected_rows)
+
+    # Preparing data on daily disruption score where the score means:
+    # 0 = no disruptions recorded/status "Unknown" only
+    # 1 = at least 1 partial disruption recorded during that day
+    # 2 = at least 1 complete disruption recorded during that day
+    reliability = reliability.copy()
+    reliability["status_unknown"] = reliability["status_en"] == "Unknown"
+    reliability["normal_service"] = reliability["status_en"] == "Normal service"
+    reliability["complete_disruption"] = (
+        reliability["status_en"] == "Complete service disruption"
+    )
+    reliability["partial_disruption"] = ~reliability["status_en"].isin(
+        [
+            "Normal service",
+            "Complete service disruption",
+            "Closed for maintenance",
+        ]
+    )
+    reliability["disruption_score"] = np.where(
+        reliability["normal_service"],
+        0,
+        np.where(
+            reliability["partial_disruption"],
+            1,
+            np.where(reliability["complete_disruption"], 2, 0),
+        ),
+    )
+    reliability["disruption_score"] = reliability.groupby("date")[
+        "disruption_score"
+    ].transform("max")
+    reliability["disruption_score"] = np.where(
+        reliability["status_unknown"], -1, reliability["disruption_score"]
+    )
+    reliability = reliability.drop_duplicates("date")
+    reliability = reliability.reset_index(drop=True)
+    reliability = reliability[["date", "disruption_score"]]
+    status_dict = {
+        -1: "Unknown status",
+        0: "Normal service",
+        1: "Partial disruption",
+        2: "Complete disruption",
+    }
+    reliability["interpretation"] = reliability["disruption_score"].map(status_dict)
+
+    # Confirming the selected period for the calendar chart
     recent_reliability = reliability[
         (reliability["date"] >= min_date) & (reliability["date"] <= max_date)
     ].copy()
-    recent_reliability = recent_reliability.sort_values("date")
-    recent_reliability = recent_reliability.reset_index(drop=True)
-    hist_reliability = reliability.sort_values("date")
-    hist_reliability = hist_reliability.reset_index(drop=True)
-
-    # Dealing with periods of system downtime
-    recent_reliability, downtime_msg = deal_with_downtime(
-        recent_reliability, selected_rows
-    )
-    hist_reliability, downtime_msg = deal_with_downtime(hist_reliability, selected_rows)
-
-    # Confirming the selected period
     selected_period, min_date, max_date = get_period_string(recent_reliability, "date")
     date_range = pd.date_range(start=min_date, end=max_date)
     date_range = pd.DataFrame(date_range, columns=["date"])
@@ -713,75 +751,36 @@ def daily_reliability():
         + downtime_msg
     )
 
-    # Preparing data on daily disruption score where the score means:
-    # 0 = no disruptions recorded/status "Unknown" only
-    # 1 = at least 1 partial disruption recorded during that day
-    # 2 = at least 1 complete disruption recorded during that day
-    cal_data = recent_reliability.copy()
-    cal_data["status_unknown"] = cal_data["status_en"] == "Unknown"
-    cal_data["normal_service"] = cal_data["status_en"] == "Normal service"
-    cal_data["complete_disruption"] = (
-        cal_data["status_en"] == "Complete service disruption"
-    )
-    cal_data["partial_disruption"] = ~cal_data["status_en"].isin(
-        [
-            "Normal service",
-            "Complete service disruption",
-            "Closed for maintenance",
-        ]
-    )
-    cal_data["disruption_score"] = np.where(
-        cal_data["normal_service"],
-        0,
-        np.where(
-            cal_data["partial_disruption"],
-            1,
-            np.where(cal_data["complete_disruption"], 2, 0),
-        ),
-    )
-    cal_data["disruption_score"] = cal_data.groupby("date")[
-        "disruption_score"
-    ].transform("max")
-    cal_data["disruption_score"] = np.where(
-        cal_data["status_unknown"], -1, cal_data["disruption_score"]
-    )
-    cal_data = cal_data.drop_duplicates("date")
-    cal_data = cal_data.reset_index(drop=True)
-    cal_data = cal_data[["date", "disruption_score"]]
-    status_dict = {
-        -1: "Unknown status",
-        0: "Normal service",
-        1: "Partial disruption",
-        2: "Complete disruption",
-    }
-    cal_data["interpretation"] = cal_data["disruption_score"].map(status_dict)
+    # Preparing datasets with N of days without disrruptions
+    # aggregated by month´
+    st.dataframe(reliability.head(5))  # WIP as of 22-03-2026
 
     # Creating summary KPIs to show above chart
-    cal_kpi = cal_data.copy()
+    cal_kpi = recent_reliability.copy()
     # KPI 1: % of days with normal service
-    cal_kpi_normal = cal_data[cal_data["disruption_score"] == 0]
+    cal_kpi_normal = recent_reliability[recent_reliability["disruption_score"] == 0]
     cal_kpi_normal = len(cal_kpi_normal) / len(cal_kpi)
     cal_kpi_normal = round(100 * cal_kpi_normal, 1)
     # KPI 2: % of days with partial disruptions
-    cal_kpi_partial = cal_data[cal_data["disruption_score"] == 1]
+    cal_kpi_partial = recent_reliability[recent_reliability["disruption_score"] == 1]
     cal_kpi_partial = len(cal_kpi_partial) / len(cal_kpi)
     cal_kpi_partial = round(100 * cal_kpi_partial, 1)
     # KPI 3: % of days with complete disruptions
-    cal_kpi_complete = cal_data[cal_data["disruption_score"] == 2]
+    cal_kpi_complete = recent_reliability[recent_reliability["disruption_score"] == 2]
     cal_kpi_complete = len(cal_kpi_complete) / len(cal_kpi)
     cal_kpi_complete = round(100 * cal_kpi_complete, 1)
 
     # Recording metadata on the daily disruption score for use on chart
-    cal_start_month = cal_data["date"].dt.month.min()
-    cal_end_month = cal_data["date"].dt.month.max()
+    cal_start_month = recent_reliability["date"].dt.month.min()
+    cal_end_month = recent_reliability["date"].dt.month.max()
     chart_height = 500  # if n_days <= 31 else None
 
     # Getting unique statuses to be shown on calplot and choosing the right colors
-    custom_colors = colors_for_calplot(cal_data)
+    custom_colors = colors_for_calplot(recent_reliability)
 
     # Creating a calplot heatmap with the daily disruption score
     cal_fig = calplot(
-        cal_data,
+        recent_reliability,
         x="date",
         y="disruption_score",
         total_height=chart_height,
@@ -799,11 +798,11 @@ def daily_reliability():
     # starting with KPIs on top of the page and proceeding with charts
     if mapping_warning:
         st.warning(mapping_warning)
-    msg_text = text["gen_page_desc"]
+    msg_text = text["daily_page_desc"]
     msg_text = msg_text.format(selected_period=selected_period)
     st.markdown(msg_text)
     cal_metric1, cal_metric2, cal_metric3 = st.columns(3)
-    cal_metric1.metric("% of days without disruptions", str(cal_kpi_normal) + "%")
+    cal_metric1.metric("% of days without any disruptions", str(cal_kpi_normal) + "%")
     cal_metric2.metric("% of days with partial disruptions", str(cal_kpi_partial) + "%")
     cal_metric3.metric(
         "% of days with complete disruptions", str(cal_kpi_complete) + "%"
@@ -813,11 +812,11 @@ def daily_reliability():
     # Note: we also plot a new set of 3 calendar KPIs
     st.subheader("Recent daily service reliability", divider="grey")
     st.markdown(cal_desc, unsafe_allow_html=True)
-    plot_or_not(cal_fig, cal_data)
+    plot_or_not(cal_fig, recent_reliability)
 
     # Plotting historical data aggregated by month [WIP as of 22-03-2026]
-    st.subheader("Historical daily service reliability", divider="grey")
-    st.markdown("WIP as of 22-03-2026...")
+    st.subheader("Days without any disruptions", divider="grey")
+    st.markdown(text["daily_page_hist_no_disr"])
 
 
 # %% Page: service disruption insights
