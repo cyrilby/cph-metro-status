@@ -215,6 +215,7 @@ options = st.sidebar.radio(
     options=[
         "Welcome",
         "Overview",
+        "Daily overview",
         "Disruption reasons",
         "Disruption impact",
         "Disruption history",
@@ -622,11 +623,101 @@ def general_overview():
     pct_disruption = round(pct_disruption, 1)
     pct_unknown = round(pct_unknown, 1)
 
+    # Creating a doughnut chart with the overall status split
+    overall_chart = px.pie(
+        overall_split, values="status_pct", names="status_en_short", hole=0.45
+    )
+    # overall_chart.update_traces(textinfo="percent+label") # adds data labels on chart
+    overall_chart.update_layout(
+        title_text=f"CPH metro service status between {selected_period}",
+        legend_title="",
+        # autosize=False,
+        # width=500,
+        # height=500,
+        # margin=dict(l=50, r=50, b=100, t=100, pad=4),
+    )
+
+    # Creating a doughnut chart with the detailed status split
+    detailed_chart = px.bar(detailed_split, x="status_pct", y="status_en")
+    detailed_chart.update_layout(
+        title_text=f"Detailed service status between {selected_period} (excl. normal service)"
+    )
+    detailed_chart.update_xaxes(title_text="% of time with non-normal service status")
+    detailed_chart.update_yaxes(title_text="Detailed service status")
+
+    # Preparing messages describing the charts
+    overall_desc = text["gen_overall_desc"]
+    detailed_desc = text["gen_detailed_desc"]
+
+    # Plotting the elements in the correct order,
+    # starting with KPIs on top of the page and proceeding with charts
+    if mapping_warning:
+        st.warning(mapping_warning)
+    msg_text = text["gen_page_desc"]
+    msg_text = msg_text.format(selected_period=selected_period)
+    st.markdown(msg_text)
+
+    metric1, metric2, metric3 = st.columns(3)
+    metric1.metric("Normal service, pct of time", str(pct_normal_service) + "%")
+    metric2.metric("Disrupted service, pct of time", str(pct_disruption) + "%")
+    metric3.metric("Unknown status, pct of time", str(pct_unknown) + "%")
+
+    st.subheader("Overall service status", divider="grey")
+    st.markdown(overall_desc)
+    plot_or_not(overall_chart, overall_split)
+
+    st.subheader("Detailed service status", divider="grey")
+    st.markdown(detailed_desc)
+    plot_or_not(detailed_chart, detailed_split)
+
+
+# %% Page: summarized daily status
+
+
+def daily_reliability():
+    customize_colors()
+    st.header("Daily service reliability")
+    add_logo()
+
+    # Detecting and confirming slicer selections
+    min_date, max_date = filter_by_date_range()
+    day_types = filter_by_day_type()
+    hour_types = filter_by_hour_type()
+    selected_lines = filter_by_line()
+    selected_rows = filter_downtime()
+
+    # Filtering and arranging the data
+    reliability = operation_fmt[operation_fmt["day_type"].isin(day_types)].copy()
+    reliability = reliability[reliability["official_rush_hour"].isin(hour_types)].copy()
+    reliability = reliability[reliability["line"].isin(selected_lines)].copy()
+    recent_reliability = reliability[
+        (reliability["date"] >= min_date) & (reliability["date"] <= max_date)
+    ].copy()
+    recent_reliability = recent_reliability.sort_values("date")
+    recent_reliability = recent_reliability.reset_index(drop=True)
+    hist_reliability = reliability.sort_values("date")
+    hist_reliability = hist_reliability.reset_index(drop=True)
+
+    # Dealing with periods of system downtime
+    recent_reliability, downtime_msg = deal_with_downtime(
+        recent_reliability, selected_rows
+    )
+    hist_reliability, downtime_msg = deal_with_downtime(hist_reliability, selected_rows)
+
+    # Confirming the selected period
+    selected_period, min_date, max_date = get_period_string(recent_reliability, "date")
+    date_range = pd.date_range(start=min_date, end=max_date)
+    date_range = pd.DataFrame(date_range, columns=["date"])
+    st.sidebar.markdown(
+        f"**Note:** this selection covers the period between {selected_period}."
+        + downtime_msg
+    )
+
     # Preparing data on daily disruption score where the score means:
     # 0 = no disruptions recorded/status "Unknown" only
     # 1 = at least 1 partial disruption recorded during that day
     # 2 = at least 1 complete disruption recorded during that day
-    cal_data = data_to_display.copy()
+    cal_data = recent_reliability.copy()
     cal_data["status_unknown"] = cal_data["status_en"] == "Unknown"
     cal_data["normal_service"] = cal_data["status_en"] == "Normal service"
     cal_data["complete_disruption"] = (
@@ -685,28 +776,6 @@ def general_overview():
     cal_end_month = cal_data["date"].dt.month.max()
     chart_height = 500  # if n_days <= 31 else None
 
-    # Creating a doughnut chart with the overall status split
-    overall_chart = px.pie(
-        overall_split, values="status_pct", names="status_en_short", hole=0.45
-    )
-    # overall_chart.update_traces(textinfo="percent+label") # adds data labels on chart
-    overall_chart.update_layout(
-        title_text=f"CPH metro service status between {selected_period}",
-        legend_title="",
-        # autosize=False,
-        # width=500,
-        # height=500,
-        # margin=dict(l=50, r=50, b=100, t=100, pad=4),
-    )
-
-    # Creating a doughnut chart with the detailed status split
-    detailed_chart = px.bar(detailed_split, x="status_pct", y="status_en")
-    detailed_chart.update_layout(
-        title_text=f"Detailed service status between {selected_period} (excl. normal service)"
-    )
-    detailed_chart.update_xaxes(title_text="% of time with non-normal service status")
-    detailed_chart.update_yaxes(title_text="Detailed service status")
-
     # Getting unique statuses to be shown on calplot and choosing the right colors
     custom_colors = colors_for_calplot(cal_data)
 
@@ -724,8 +793,6 @@ def general_overview():
     )
 
     # Preparing messages describing the charts
-    overall_desc = text["gen_overall_desc"]
-    detailed_desc = text["gen_detailed_desc"]
     cal_desc = text["gen_cal_desc"]
 
     # Plotting the elements in the correct order,
@@ -735,26 +802,6 @@ def general_overview():
     msg_text = text["gen_page_desc"]
     msg_text = msg_text.format(selected_period=selected_period)
     st.markdown(msg_text)
-
-    metric1, metric2, metric3 = st.columns(3)
-    metric1.metric("Normal service, pct of time", str(pct_normal_service) + "%")
-    metric2.metric("Disrupted service, pct of time", str(pct_disruption) + "%")
-    metric3.metric("Unknown status, pct of time", str(pct_unknown) + "%")
-
-    st.subheader("Overall service status", divider="grey")
-    st.markdown(overall_desc)
-    plot_or_not(overall_chart, overall_split)
-
-    st.subheader("Detailed service status", divider="grey")
-    st.markdown(detailed_desc)
-    plot_or_not(detailed_chart, detailed_split)
-
-    # Plotting a calendar-based overview
-    # Note: we also plot a new set of 3 calendar KPIs
-    st.subheader("Daily service reliability", divider="grey")
-
-    st.markdown(cal_desc, unsafe_allow_html=True)
-
     cal_metric1, cal_metric2, cal_metric3 = st.columns(3)
     cal_metric1.metric("% of days without disruptions", str(cal_kpi_normal) + "%")
     cal_metric2.metric("% of days with partial disruptions", str(cal_kpi_partial) + "%")
@@ -762,9 +809,15 @@ def general_overview():
         "% of days with complete disruptions", str(cal_kpi_complete) + "%"
     )
 
-    st.markdown("<br>", unsafe_allow_html=True)
-
+    # Plotting a calendar-based overview
+    # Note: we also plot a new set of 3 calendar KPIs
+    st.subheader("Recent daily service reliability", divider="grey")
+    st.markdown(cal_desc, unsafe_allow_html=True)
     plot_or_not(cal_fig, cal_data)
+
+    # Plotting historical data aggregated by month [WIP as of 22-03-2026]
+    st.subheader("Historical daily service reliability", divider="grey")
+    st.markdown("WIP as of 22-03-2026...")
 
 
 # %% Page: service disruption insights
@@ -1916,6 +1969,8 @@ if options == "Welcome":
     show_homepage()
 elif options == "Overview":
     general_overview()
+elif options == "Daily overview":
+    daily_reliability()
 elif options == "Disruption reasons":
     disruption_reasons()
 elif options == "Disruption impact":
