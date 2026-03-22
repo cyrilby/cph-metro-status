@@ -71,6 +71,15 @@ gen_cal_desc: |
 gen_page_desc: "This page shows information on the **overall status of the metro between {selected_period}**, including the share of the time where service was running normally or with disruptions."
 
 
+# ==================================================
+# Text shown on the "Daily service reliability" page
+# ==================================================
+
+daily_page_desc: "This page shows an **alternative metric of the metro's service reliability between {selected_period}**, which is based on classifying each day into one of three categories: *Days with normal service (only)*, *Days with (at least one) partial disruption* or *Days with (at least one) complete disruption*. Please note that the KPIs shown on top of the page as well as the calendar chart are based on the selected period, while the remaining charts are based on the entirety of the historical data."
+
+daily_page_hist_no_disr: "The chart below shows the development in the share of days without any disruption aggregated by calendar month throughout the entirety of the historical data. As such, it allows us to see both whether there is a general trend of increase/decrease in service reliability and spot potential seasonal patterns."
+
+
 # ===========================================
 # Text shown on the "Disruption reasons" page
 # ===========================================
