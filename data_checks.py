@@ -4,7 +4,7 @@ Checking data collection & mapping
 ==================================
 
 Author: github.com/cyrilby
-Last meaningful update: 22-02-2026
+Last meaningful update: 03-04-2026
 """
 
 # %% Setting up
@@ -28,7 +28,7 @@ operation_raw = pd.read_pickle(
 operation_raw["status"] = operation_raw["status"].fillna("Unknown")
 
 print("Showing latest raw data from the CPH metro scraper tool:")
-operation_raw.head(20)
+print(operation_raw.head(20))
 
 
 # %% Checking the mapping completeness
