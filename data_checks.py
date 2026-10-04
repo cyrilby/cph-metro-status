@@ -10,7 +10,6 @@ Last meaningful update: 04-10-2026
 # %% Setting up
 
 import os
-import yaml
 import pandas as pd
 from storage import get_s3_access
 
@@ -34,12 +33,9 @@ print(operation_raw.head(20))
 
 # %% Checking the mapping completeness
 
-# Importing links to mapping tables
-with open("mapping_links.yaml", "r", encoding="utf-8") as file:
-    mapping_links = yaml.safe_load(file)
-
 # Importing user-maintained mapping tables
-mapping_status = pd.read_csv(mapping_links["mapping_status"])
+mapping_file = "https://github.com/cyrilby/cph-metro-status/raw/refs/heads/main/data/mapping_tables.xlsx"
+mapping_status = pd.read_excel(mapping_file, sheet_name="status")
 
 unmapped_entries = [
     status

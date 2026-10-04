@@ -4,7 +4,7 @@ Format & summarize data on the metro's operational status
 =========================================================
 
 Author: github.com/cyrilby
-Last meaningful update: 22-03-2026
+Last meaningful update: 04-10-2026
 
 In this script, we import data on the Copenhagen Metro's
 operational status collected at different timestamps,
@@ -23,15 +23,10 @@ import pandas as pd
 import numpy as np
 import datetime as dt
 from datetime import time
-import yaml
 from storage import get_s3_access
 
 # Importing the credentials for working with object storage
 storage_options, bucket = get_s3_access()
-
-# Importing links to mapping tables
-with open("mapping_links.yaml", "r", encoding="utf-8") as file:
-    mapping_links = yaml.safe_load(file)
 
 # Importing raw data from cloud storage
 operation_raw = pd.read_pickle(
@@ -39,19 +34,20 @@ operation_raw = pd.read_pickle(
 )
 
 # Importing user-maintained mapping tables
-mapping_status = pd.read_csv(mapping_links["mapping_status"])
+# Note: these are stored in Git but it's best to always fetch
+# them from the online repo itself rather than load them from
+# the locally synced repo (in case the latter is not up-to-date)
+mapping_file = "https://github.com/cyrilby/cph-metro-status/raw/refs/heads/main/data/mapping_tables.xlsx"
 
-mapping_hours = pd.read_csv(mapping_links["mapping_hours"])
+mapping_status = pd.read_excel(mapping_file, sheet_name="status")
 
-mapping_rush = pd.read_csv(mapping_links["mapping_rush"])
+mapping_hours = pd.read_excel(mapping_file, sheet_name="hours")
 
-mapping_stations = pd.read_csv(mapping_links["mapping_stations"])
+mapping_rush = pd.read_excel(mapping_file, sheet_name="rush_hour")
 
-system_downtime = pd.read_csv(
-    mapping_links["system_downtime"],
-    parse_dates=["date", "last_modified"],
-    date_format="%d/%m/%Y",
-)
+mapping_stations = pd.read_excel(mapping_file, sheet_name="stations")
+
+system_downtime = pd.read_excel(mapping_file, sheet_name="system_downtime")
 
 # Default "Normal" status to be used in cases where messages displayed
 # on screens are only meant to serve as warnings to passengers
@@ -319,20 +315,16 @@ operation_fmt["eomonth"] = operation_fmt["date"] + pd.offsets.MonthEnd(0)
 morning_rush_start = mapping_rush[mapping_rush["rush_hour"] == "Morning"]["start"].iloc[
     0
 ]
-morning_rush_start = pd.to_datetime(morning_rush_start).time()
 
 morning_rush_end = mapping_rush[mapping_rush["rush_hour"] == "Morning"]["end"].iloc[0]
-morning_rush_end = pd.to_datetime(morning_rush_end).time()
 
 afternoon_rush_start = mapping_rush[mapping_rush["rush_hour"] == "Afternoon"][
     "start"
 ].iloc[0]
-afternoon_rush_start = pd.to_datetime(afternoon_rush_start).time()
 
 afternoon_rush_end = mapping_rush[mapping_rush["rush_hour"] == "Afternoon"]["end"].iloc[
     0
 ]
-afternoon_rush_end = pd.to_datetime(afternoon_rush_end).time()
 
 conditions = [
     (operation_fmt["time"] >= morning_rush_start)

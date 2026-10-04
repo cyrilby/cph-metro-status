@@ -32,10 +32,6 @@ from storage import get_s3_access
 with open("text.yaml", "r", encoding="utf-8") as file:
     text = yaml.safe_load(file)
 
-# Importing links to mapping tables
-with open("mapping_links.yaml", "r", encoding="utf-8") as file:
-    mapping_links = yaml.safe_load(file)
-
 # Importing the credentials for working with object storage
 storage_options, bucket = get_s3_access()
 
@@ -104,11 +100,9 @@ mapping_stations = pd.read_pickle(
 mapping_messages = pd.read_pickle(
     f"s3://{bucket}/mapping_messages.pkl", storage_options=storage_options
 )
-system_downtime = pd.read_csv(
-    mapping_links["system_downtime"],
-    parse_dates=["date", "last_modified"],
-    date_format="%d/%m/%Y",
-)
+mapping_file = "https://github.com/cyrilby/cph-metro-status/raw/refs/heads/main/data/mapping_tables.xlsx"
+system_downtime = pd.read_excel(mapping_file, sheet_name="system_downtime")
+
 
 # Correcting dtypes
 operation_fmt["date"] = pd.to_datetime(operation_fmt["date"])
@@ -156,7 +150,7 @@ unique_day_names = [
 ]
 
 # Importing user-maintained mapping tables
-mapping_status = pd.read_csv(mapping_links["mapping_status"])
+mapping_status = pd.read_excel(mapping_file, sheet_name="status")
 
 # Detecting whether there are any unmapped service status messages
 # as well as the date(s) where data accuracy may be impacted due to lacking mapping
