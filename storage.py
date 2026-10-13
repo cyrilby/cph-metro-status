@@ -120,7 +120,7 @@ def connect_to_db(read_only: bool = True) -> duckdb.DuckDBPyConnection:
 
 def remove_file(file_name: str) -> None:
 
-    if os.file.exists(file_name):
+    if os.path.exists(file_name):
         os.remove(file_name)
 
 
