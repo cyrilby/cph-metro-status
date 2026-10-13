@@ -11,6 +11,11 @@ This project is centered around automatically gathering data from the [Copenhage
 
 The project consists of four scripts, which are described shortly below.
 
+## Requirements
+
+- Python 3.12.10
+- Python packages as specified in the `requirements.txt` file
+
 ## Current status
 
 * The raw data fetched in the process is then stored in a `pickle` file, after which point it is subjected to further data processing which standardizes the operational status messages and details their implications for passengers.
