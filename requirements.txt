@@ -5,7 +5,9 @@ bs4==0.0.1
 selenium==4.35.0
 plotly_calplot==0.1.20
 openpyxl==3.1.2
-pyarrow==16.0
 PyYAML==6.0.2
+pyarrow==16.0
 python-dotenv==1.2.1
 s3fs>=2026.1.0
+boto3>=1.43
+duckdb>=1.5.6
