@@ -699,6 +699,7 @@ cols_to_keep = [
     "weekday",
     "day_type",
     "hour",
+    "official_rush_hour",
     "line",
     "status_dk",
     "status_en",
