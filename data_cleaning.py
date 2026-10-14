@@ -805,6 +805,14 @@ mapping_status.to_pickle(
     storage_options=storage_options,
 )
 
+# Temporary fix of col types for DuckDB
+# WIP: I need to figure out whether I should use DuckDB for
+# storage or just load the data from parquet files
+for col in operation_fmt.select_dtypes(include="category").columns:
+    operation_fmt[col] = operation_fmt[col].astype("string")
+for col in station_impact.select_dtypes(include="category").columns:
+    station_impact[col] = station_impact[col].astype("string")
+
 # Creating a local DuckDB with the output data
 conn = connect_to_db(read_only=False)
 conn.execute("CREATE OR REPLACE TABLE operation_fmt AS SELECT * FROM operation_fmt")
