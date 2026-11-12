@@ -4,13 +4,15 @@ Checking data collection & mapping
 ==================================
 
 Author: github.com/cyrilby
-Last meaningful update: 04-10-2026
+Last meaningful update: 12-11-2026
 """
 
 # %% Setting up
 
 import os
+
 import pandas as pd
+
 from storage import get_s3_access
 
 # Importing the credentials for working with object storage
@@ -34,8 +36,11 @@ print(operation_raw.head(20))
 # %% Checking the mapping completeness
 
 # Importing user-maintained mapping tables
-mapping_file = "https://github.com/cyrilby/cph-metro-status/raw/refs/heads/main/data/mapping_tables.xlsx"
-mapping_status = pd.read_excel(mapping_file, sheet_name="status")
+mapping_status = pd.read_excel(
+    f"s3://{bucket}/mapping_tables.xlsx",
+    storage_options=storage_options,
+    sheet_name="status",
+)
 
 unmapped_entries = [
     status

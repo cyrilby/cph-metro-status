@@ -4,7 +4,7 @@ Format & summarize data on the metro's operational status
 =========================================================
 
 Author: github.com/cyrilby
-Last meaningful update: 04-10-2026
+Last meaningful update: 12-11-2026
 
 In this script, we import data on the Copenhagen Metro's
 operational status collected at different timestamps,
@@ -18,12 +18,15 @@ analytical purposes.
 
 # %% Setting things up
 
-# Importing relevant packages
-import pandas as pd
-import numpy as np
 import datetime as dt
 from datetime import time
-from storage import get_s3_access
+
+import numpy as np
+
+# Importing relevant packages
+import pandas as pd
+
+from storage import connect_to_db, get_s3_access, manage_s3_file, remove_file
 
 # Importing the credentials for working with object storage
 storage_options, bucket = get_s3_access()
@@ -34,20 +37,35 @@ operation_raw = pd.read_pickle(
 )
 
 # Importing user-maintained mapping tables
-# Note: these are stored in Git but it's best to always fetch
-# them from the online repo itself rather than load them from
-# the locally synced repo (in case the latter is not up-to-date)
-mapping_file = "https://github.com/cyrilby/cph-metro-status/raw/refs/heads/main/data/mapping_tables.xlsx"
+mapping_status = pd.read_excel(
+    f"s3://{bucket}/mapping_tables.xlsx",
+    storage_options=storage_options,
+    sheet_name="status",
+)
 
-mapping_status = pd.read_excel(mapping_file, sheet_name="status")
+mapping_hours = pd.read_excel(
+    f"s3://{bucket}/mapping_tables.xlsx",
+    storage_options=storage_options,
+    sheet_name="hours",
+)
 
-mapping_hours = pd.read_excel(mapping_file, sheet_name="hours")
+mapping_rush = pd.read_excel(
+    f"s3://{bucket}/mapping_tables.xlsx",
+    storage_options=storage_options,
+    sheet_name="rush_hour",
+)
 
-mapping_rush = pd.read_excel(mapping_file, sheet_name="rush_hour")
+mapping_stations = pd.read_excel(
+    f"s3://{bucket}/mapping_tables.xlsx",
+    storage_options=storage_options,
+    sheet_name="stations",
+)
 
-mapping_stations = pd.read_excel(mapping_file, sheet_name="stations")
-
-system_downtime = pd.read_excel(mapping_file, sheet_name="system_downtime")
+system_downtime = pd.read_excel(
+    f"s3://{bucket}/mapping_tables.xlsx",
+    storage_options=storage_options,
+    sheet_name="system_downtime",
+)
 
 # Default "Normal" status to be used in cases where messages displayed
 # on screens are only meant to serve as warnings to passengers
@@ -696,6 +714,7 @@ cols_to_keep = [
     "weekday",
     "day_type",
     "hour",
+    "official_rush_hour",
     "line",
     "status_dk",
     "status_en",
@@ -800,6 +819,26 @@ mapping_status.to_pickle(
     f"s3://{bucket}/mapping_messages.pkl",
     storage_options=storage_options,
 )
+
+# Temporary fix of col types for DuckDB
+# WIP: I need to figure out whether I should use DuckDB for
+# storage or just load the data from parquet files
+for col in operation_fmt.select_dtypes(include="category").columns:
+    operation_fmt[col] = operation_fmt[col].astype("string")
+for col in station_impact.select_dtypes(include="category").columns:
+    station_impact[col] = station_impact[col].astype("string")
+
+# Creating a local DuckDB with the output data
+conn = connect_to_db(read_only=False)
+conn.execute("CREATE OR REPLACE TABLE operation_fmt AS SELECT * FROM operation_fmt")
+conn.execute("CREATE OR REPLACE TABLE station_impact AS SELECT * FROM station_impact")
+conn.execute("CREATE OR REPLACE TABLE mapping_messages AS SELECT * FROM mapping_status")
+conn.execute("CREATE OR REPLACE TABLE mapping_stations AS SELECT * FROM mapping_status")
+conn.close()
+
+# Uploading the DuckDB file to S3 storage and deleting local copy
+manage_s3_file("database.duckdb", "database.duckdb", "upload")
+remove_file("database.duckdb")
 
 print("Note: Data cleaned up and exported to cloud storage.")
 

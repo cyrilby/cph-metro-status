@@ -17,15 +17,18 @@ on those is available).
 
 # %% Setting things up
 
+import datetime as dt
+
+import numpy as np
+
 # Importing relevant packages
 import pandas as pd
-import numpy as np
-import datetime as dt
-import streamlit as st
 import plotly.express as px
 import plotly.io as pio
-from plotly_calplot import calplot
+import streamlit as st
 import yaml
+from plotly_calplot import calplot
+
 from storage import get_s3_access
 
 # Importing long text strings used in the app
@@ -100,8 +103,11 @@ mapping_stations = pd.read_pickle(
 mapping_messages = pd.read_pickle(
     f"s3://{bucket}/mapping_messages.pkl", storage_options=storage_options
 )
-mapping_file = "https://github.com/cyrilby/cph-metro-status/raw/refs/heads/main/data/mapping_tables.xlsx"
-system_downtime = pd.read_excel(mapping_file, sheet_name="system_downtime")
+system_downtime = pd.read_excel(
+    f"s3://{bucket}/mapping_tables.xlsx",
+    storage_options=storage_options,
+    sheet_name="system_downtime",
+)
 
 
 # Correcting dtypes
@@ -150,7 +156,11 @@ unique_day_names = [
 ]
 
 # Importing user-maintained mapping tables
-mapping_status = pd.read_excel(mapping_file, sheet_name="status")
+mapping_status = pd.read_excel(
+    f"s3://{bucket}/mapping_tables.xlsx",
+    storage_options=storage_options,
+    sheet_name="status",
+)
 
 # Detecting whether there are any unmapped service status messages
 # as well as the date(s) where data accuracy may be impacted due to lacking mapping
