@@ -4,7 +4,7 @@ Format & summarize data on the metro's operational status
 =========================================================
 
 Author: github.com/cyrilby
-Last meaningful update: 12-11-2026
+Last meaningful update: 18-11-2026
 
 In this script, we import data on the Copenhagen Metro's
 operational status collected at different timestamps,
@@ -720,6 +720,7 @@ cols_to_keep = [
     "status_en",
     "status_en_short",
     "affected_stations",
+    "system_downtime",
 ]
 affected_stations = operation_fmt[cols_to_keep].copy()
 affected_stations["affected_stations"] = affected_stations["affected_stations"].fillna(
