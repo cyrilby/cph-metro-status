@@ -837,6 +837,8 @@ conn.execute("CREATE OR REPLACE TABLE mapping_messages AS SELECT * FROM mapping_
 conn.execute(
     "CREATE OR REPLACE TABLE mapping_stations AS SELECT * FROM mapping_stations"
 )
+conn.execute("CREATE OR REPLACE TABLE mapping_hours AS SELECT * FROM mapping_hours")
+conn.execute("CREATE OR REPLACE TABLE mapping_rush AS SELECT * FROM mapping_rush")
 conn.close()
 
 # Uploading the DuckDB file to S3 storage and deleting local copy
