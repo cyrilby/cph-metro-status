@@ -4,7 +4,7 @@ Format & summarize data on the metro's operational status
 =========================================================
 
 Author: github.com/cyrilby
-Last meaningful update: 18-11-2026
+Last meaningful update: 19-11-2026
 
 In this script, we import data on the Copenhagen Metro's
 operational status collected at different timestamps,
@@ -839,6 +839,9 @@ conn.execute(
 )
 conn.execute("CREATE OR REPLACE TABLE mapping_hours AS SELECT * FROM mapping_hours")
 conn.execute("CREATE OR REPLACE TABLE mapping_rush AS SELECT * FROM mapping_rush")
+conn.execute(
+    "CREATE OR REPLACE TABLE mapping_downtime AS SELECT * FROM system_downtime"
+)
 conn.close()
 
 # Uploading the DuckDB file to S3 storage and deleting local copy
