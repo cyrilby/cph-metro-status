@@ -8,3 +8,4 @@ credentials/azure_conn.txt
 /.vscode
 unmapped_entries.xlsx
 data/unmapped_status_messages.xlsx
+database.duckdb

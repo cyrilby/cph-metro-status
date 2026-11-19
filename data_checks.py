@@ -4,7 +4,7 @@ Checking data collection & mapping
 ==================================
 
 Author: github.com/cyrilby
-Last meaningful update: 12-11-2026
+Last meaningful update: 19-11-2026
 
 This script is designed to check the latest status of the
 raw data collection (web scraping) jobs as well as to quickly
@@ -18,10 +18,13 @@ import os
 
 import pandas as pd
 
-from storage import get_s3_access
+from storage import connect_to_db, get_s3_access, manage_s3_file, remove_file
 
 # Importing the credentials for working with object storage
 storage_options, bucket = get_s3_access()
+
+# Whether to check for the % of unknown status by date
+check_daily_unknown = False
 
 
 # %% Checking data collection status
@@ -71,6 +74,54 @@ else:
     # Remove local XLSX file if all messages are mapped
     if os.path.exists(mapping_file):
         os.remove(mapping_file)
+
+
+# %% Check the % of unknown status entries by date (optional)
+
+if check_daily_unknown:
+    # Getting data the latest version of the clean data
+    manage_s3_file("database.duckdb", "database.duckdb", "download")
+    conn = connect_to_db()
+
+    # Running a query to check the daily values
+    query = """
+    SELECT
+        date,
+        CASE
+            WHEN status_en = 'Unknown' THEN 'Unknown'
+            ELSE 'Known'
+        END AS overall_status,
+        COUNT(*) AS number_of_rows
+    FROM operation_fmt
+    GROUP BY
+        date,
+        CASE
+            WHEN status_en = 'Unknown' THEN 'Unknown'
+            ELSE 'Known'
+        END;
+    """
+    daily_unknown = conn.execute(query).fetch_df()
+
+    # Transforming the data into percentages
+    daily_unknown["daily_rows"] = daily_unknown.groupby("date")[
+        "number_of_rows"
+    ].transform("sum")
+    daily_unknown["pct_unknown"] = (
+        daily_unknown["number_of_rows"] / daily_unknown["daily_rows"]
+    )
+    daily_unknown["pct_unknown"] *= 100
+    daily_unknown = daily_unknown[daily_unknown["overall_status"] == "Unknown"]
+
+    # Previewing the daily share of unknown entries
+    cols_keep = ["pct_unknown", "date"]
+    sort_asc = [False, False]
+    daily_unknown = daily_unknown[cols_keep]
+    daily_unknown = daily_unknown.sort_values(cols_keep, ascending=sort_asc)
+    daily_unknown = daily_unknown.reset_index(drop=True)
+    daily_unknown
+
+    # Cleaning up
+    remove_file("database.duckdb")
 
 
 # %%
