@@ -6,7 +6,7 @@
 
 * Author: Kiril (GitHub@cyrilby)
 * Website: [mindgraph.dk](https://mindgraph.dk)
-* Last meaningful update: 11-01-2026
+* Last meaningful update: 19-11-2026
 
 This project is centered around automatically gathering data from the [Copenhagen Metro's website](https://m.dk) and monitoring its operations over time in order to find out how often (and when) things are most likely to break. This repository contains the code behing the **data sourcing and cleaning**.
 
