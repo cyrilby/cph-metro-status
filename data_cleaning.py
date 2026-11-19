@@ -794,36 +794,7 @@ station_impact = optimize_dataframe(station_impact)
 mapping_stations = optimize_dataframe(mapping_stations)
 mapping_status = optimize_dataframe(mapping_status)
 
-# # Temp data preview
-# operation_fmt.head(5)
-# station_impact.head(5)
-
-# Exporting formatted data locally
-# operation_fmt.to_parquet("data/operation_fmt.parquet")
-# station_impact.to_parquet("data/station_impact.parquet")
-# mapping_stations.to_pickle("data/mapping_stations.pkl")
-
-# Uploading data to cloud storage
-operation_fmt.to_parquet(
-    f"s3://{bucket}/operation_fmt.parquet",
-    storage_options=storage_options,
-)
-station_impact.to_parquet(
-    f"s3://{bucket}/station_impact.parquet",
-    storage_options=storage_options,
-)
-mapping_stations.to_pickle(
-    f"s3://{bucket}/mapping_stations.pkl",
-    storage_options=storage_options,
-)
-mapping_status.to_pickle(
-    f"s3://{bucket}/mapping_messages.pkl",
-    storage_options=storage_options,
-)
-
-# Temporary fix of col types for DuckDB
-# WIP: I need to figure out whether I should use DuckDB for
-# storage or just load the data from parquet files
+# Fixing col types for DuckDB storage
 for col in operation_fmt.select_dtypes(include="category").columns:
     operation_fmt[col] = operation_fmt[col].astype("string")
 for col in station_impact.select_dtypes(include="category").columns:

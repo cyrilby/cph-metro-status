@@ -6,18 +6,20 @@ Creating weekly data back-ups
 Author: github.com/cyrilby
 Last meaningful update: 22-02-2026
 
-Quite simple - a script design to import the latest raw
+Quite simple - a script designed to import the latest raw
 data from cloud storage, then create a copy of the file
-in the "backup" folder with a timestamp. This could be
-scheduled e.g. once a week to ensure an accidental file
+in the "backup" folder with a timestamp. This operation is
+scheduled a few times a week to ensure an accidental file
 corruption does not result in losing all the data we have.
 """
 
 # %% Setting things up
 
+import datetime as dt
+
 # Importing relevant packages
 import pandas as pd
-import datetime as dt
+
 from storage import get_s3_access
 
 # Importing the credentials for working with object storage

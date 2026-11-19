@@ -5,6 +5,11 @@ Checking data collection & mapping
 
 Author: github.com/cyrilby
 Last meaningful update: 12-11-2026
+
+This script is designed to check the latest status of the
+raw data collection (web scraping) jobs as well as to quickly
+check whether there may be any status messages that have not
+yet been mapped to the standardized operational statuses.
 """
 
 # %% Setting up
